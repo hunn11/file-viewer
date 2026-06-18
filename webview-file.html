@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>文件预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+        }
+        .file-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 16px;
+            background: #e8f4fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin: 0 auto 16px;
+        }
+        .file-name {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a2332;
+            word-break: break-all;
+            margin-bottom: 8px;
+        }
+        .file-size {
+            text-align: center;
+            font-size: 14px;
+            color: #8c9aa8;
+            margin-bottom: 20px;
+        }
+        .status-tip {
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            background: #f0f7ff;
+            color: #2b7de9;
+        }
+        .status-tip.cached {
+            background: #e8f8ee;
+            color: #1aad5f;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: #2b7de9;
+            color: white;
+        }
+        .btn-primary:active {
+            background: #1a6ad4;
+            transform: scale(0.98);
+        }
+        .btn-primary:disabled {
+            background: #a0b8d0;
+            cursor: not-allowed;
+        }
+        .btn-outline {
+            background: white;
+            color: #2b7de9;
+            border: 1.5px solid #2b7de9;
+        }
+        .btn-outline:active {
+            background: #f0f7ff;
+        }
+        .btn-success {
+            background: #1aad5f;
+            color: white;
+        }
+        .btn-success:active {
+            background: #15954f;
+        }
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+        .btn-danger:active {
+            background: #e55a5a;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 12px;
+            color: #8c9aa8;
+            font-size: 14px;
+        }
+        .loading.active {
+            display: block;
+        }
+        .loading .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e0e6ed;
+            border-top-color: #2b7de9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e8ecf0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 12px 0;
+            display: none;
+        }
+        .progress-bar.active {
+            display: block;
+        }
+        .progress-bar .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2b7de9, #1aad5f);
+            border-radius: 4px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f2f5;
+            font-size: 14px;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: #8c9aa8;
+        }
+        .info-value {
+            color: #1a2332;
+            font-weight: 500;
+            word-break: break-all;
+            text-align: right;
+            max-width: 60%;
+        }
+        .toast {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.75);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            max-width: 90%;
+            text-align: center;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+        .toast.success {
+            background: rgba(26, 173, 95, 0.9);
+        }
+        .toast.error {
+            background: rgba(255, 107, 107, 0.9);
+        }
+        .file-list {
+            margin-top: 12px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #f8f9fc;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        .file-item:active {
+            background: #eef0f5;
+        }
+        .file-item .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            margin-right: 12px;
+            min-width: 0;
+        }
+        .file-item .item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a2332;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-item .item-meta {
+            font-size: 12px;
+            color: #8c9aa8;
+        }
+        .file-item .item-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .file-item .item-status.cached {
+            background: #e8f8ee;
+            color: #1aad5f;
+        }
+        .file-item .item-status.uncached {
+            background: #fff3e0;
+            color: #f5a623;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Toast 提示 -->
+<div id="toast" class="toast"></div>
+
+<div class="container">
+    <!-- 文件信息卡片 -->
+    <div class="card" id="fileCard">
+        <div class="file-icon">📄</div>
+        <div class="file-name" id="fileName">文件名称</div>
+        <div class="file-size" id="fileSize">文件大小未知</div>
+
+        <!-- 状态提示 -->
+        <div class="status-tip" id="statusTip">⏳ 点击下方按钮下载或预览</div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- 加载提示 -->
+        <div class="loading" id="loading">
+            <span class="spinner"></span>
+            <span id="loadingText">加载中...</span>
+        </div>
+
+        <!-- 按钮组 -->
+        <div class="btn-group">
+            <button class="btn btn-primary" id="mainBtn">📥 下载文件</button>
+            <button class="btn btn-outline" id="cacheBtn" style="display:none;">🗑️ 清除缓存</button>
+        </div>
+    </div>
+
+    <!-- 文件信息详情 -->
+    <div class="card">
+        <div class="info-row">
+            <span class="info-label">文件名</span>
+            <span class="info-value" id="infoName">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">文件大小</span>
+            <span class="info-value" id="infoSize">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">缓存状态</span>
+            <span class="info-value" id="infoCacheStatus">未缓存</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">文件链接</span>
+            <span class="info-value" id="infoUrl" style="font-size:12px;font-weight:400;color:#8c9aa8;word-break:break-all;">-</span>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// 配置区 - 从 URL 参数读取文件信息
+// ============================================================
+const urlParams = new URLSearchParams(window.location.search);
+const FILE_URL = urlParams.get('url') || '';
+const FILE_NAME = urlParams.get('name') || '未知文件';
+const FILE_SIZE = parseInt(urlParams.get('size')) || 0;
+const FILE_TYPE = urlParams.get('type') || '';
+
+// 存储状态
+let cachedFilePath = null;        // 缓存的文件路径（小程序沙盒路径）
+let isFileCached = false;         // 文件是否已缓存
+let downloadTask = null;          // 下载任务引用
+let isDownloading = false;        // 是否正在下载
+
+// ============================================================
+// DOM 引用
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const fileNameEl = $('fileName');
+const fileSizeEl = $('fileSize');
+const statusTip = $('statusTip');
+const progressBar = $('progressBar');
+const progressFill = $('progressFill');
+const loading = $('loading');
+const loadingText = $('loadingText');
+const mainBtn = $('mainBtn');
+const cacheBtn = $('cacheBtn');
+const infoName = $('infoName');
+const infoSize = $('infoSize');
+const infoCacheStatus = $('infoCacheStatus');
+const infoUrl = $('infoUrl');
+const toast = $('toast');
+
+// ============================================================
+// 工具函数
+// ============================================================
+function formatSize(bytes) {
+    if (!bytes || bytes === 0) return '未知大小';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return bytes.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+function showToast(message, type = 'info', duration = 2500) {
+    toast.textContent = message;
+    toast.className = 'toast ' + type;
+    // 强制回流后显示
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, duration);
+}
+
+// ============================================================
+// 核心：检查文件是否已缓存（通过小程序 API）
+// ============================================================
+function checkFileCached() {
+    return new Promise((resolve) => {
+        // 检查是否有小程序环境
+        if (typeof window.__wxjs_environment === 'undefined' && !window.uni) {
+            // 非小程序环境（普通浏览器），直接返回 false
+            resolve(false);
+            return;
+        }
+
+        // 通过 UniApp 的桥接能力检查文件是否存在
+        // 注意：这里需要配合小程序端 WebView 的 postMessage 能力
+        // 但简化方案：尝试通过 document.cookie 或 localStorage 记录缓存状态
+        const cacheKey = 'file_cached_' + encodeURIComponent(FILE_URL);
+        const cached = localStorage.getItem(cacheKey);
+        if (cached === 'true') {
+            isFileCached = true;
+            resolve(true);
+        } else {
+            resolve(false);
+        }
+    });
+}
+
+// ============================================================
+// 核心：发起下载（触发小程序下载）
+// ============================================================
+function downloadFile() {
+    if (isDownloading) {
+        showToast('正在下载中，请稍候...', 'info');
+        return;
+    }
+
+    if (!FILE_URL) {
+        showToast('文件链接无效', 'error');
+        return;
+    }
+
+    isDownloading = true;
+    mainBtn.disabled = true;
+    mainBtn.textContent = '⏳ 下载中...';
+    loading.classList.add('active');
+    loadingText.textContent = '正在下载文件...';
+    progressBar.classList.add('active');
+    statusTip.textContent = '⏳ 正在下载，请稍候...';
+    statusTip.className = 'status-tip';
+
+    // 构建下载参数
+    const downloadParams = {
+        url: FILE_URL,
+        name: FILE_NAME,
+        type: FILE_TYPE
+    };
+
+    // 通过 postMessage 通知小程序端执行下载
+    // 方式1：使用 UniApp 的 webview 通信
+    if (window.uni && uni.postMessage) {
+        uni.postMessage({
+            data: {
+                action: 'downloadFile',
+                params: downloadParams
+            }
+        });
+        showToast('已通知小程序下载', 'info');
+        // 模拟进度（实际进度由小程序端回调）
+        simulateProgress();
+    } 
+    // 方式2：使用微信小程序 WebView 的 wx.miniProgram.postMessage
+    else if (window.wx && wx.miniProgram) {
+        wx.miniProgram.postMessage({
+            data: {
+                action: 'downloadFile',
+                params: downloadParams
+            }
+        });
+        showToast('已通知小程序下载', 'info');
+        simulateProgress();
+    }
+    // 方式3：普通浏览器环境 - 直接触发下载
+    else {
+        directDownload(FILE_URL, FILE_NAME);
+    }
+}
+
+// ============================================================
+// 模拟下载进度（实际进度由小程序端实时反馈）
+// ============================================================
+function simulateProgress() {
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15 + 5;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            // 下载完成由小程序端回调通知
+        }
+        progressFill.style.width = Math.min(progress, 95) + '%';
+    }, 500);
+    // 存储 interval 以便取消
+    window._progressInterval = interval;
+}
+
+// ============================================================
+// 直接下载（非小程序环境兜底）
+// ============================================================
+function directDownload(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'file';
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('已开始下载', 'success');
+    resetUI();
+}
+
+// ============================================================
+// 打开文件（通过小程序 API）
+// ============================================================
+function openFile() {
+    if (!isFileCached) {
+        showToast('文件尚未缓存，请先下载', 'error');
+        return;
+    }
+
+    // 通知小程序打开文件
+    const openParams = {
+        filePath: cachedFilePath,
+        name: FILE_NAME
+    };
+
+    if (window.uni && uni.postMessage) {
+        uni.postMessage({
+            data: {
+                action: 'openFile',
+                params: openParams
+            }
+        });
+    } else if (window.wx && wx.miniProgram) {
+        wx.miniProgram.postMessage({
+            data: {
+                action: 'openFile',
+                params: openParams
+            }
+        });
+    } else {
+        // 兜底：直接尝试打开链接
+        window.open(FILE_URL, '_blank');
+    }
+    showToast('正在打开文件...', 'info');
+}
+
+// ============================================================
+// 清除缓存
+// ============================================================
+function clearCache() {
+    if (!isFileCached) {
+        showToast('没有缓存可清除', 'info');
+        return;
+    }
+
+    if (window.uni && uni.postMessage) {
+        uni.postMessage({
+            data: {
+                action: 'clearCache',
+                params: { filePath: cachedFilePath, url: FILE_URL }
+            }
+        });
+    } else if (window.wx && wx.miniProgram) {
+        wx.miniProgram.postMessage({
+            data: {
+                action: 'clearCache',
+                params: { filePath: cachedFilePath, url: FILE_URL }
+            }
+        });
+    }
+
+    // 本地清除记录
+    const cacheKey = 'file_cached_' + encodeURIComponent(FILE_URL);
+    localStorage.removeItem(cacheKey);
+    isFileCached = false;
+    cachedFilePath = null;
+    updateUI();
+    showToast('缓存已清除', 'success');
+}
+
+// ============================================================
+// 更新 UI
+// ============================================================
+function updateUI() {
+    // 文件名
+    fileNameEl.textContent = FILE_NAME || '未知文件';
+    infoName.textContent = FILE_NAME || '-';
+
+    // 文件大小
+    const sizeText = formatSize(FILE_SIZE);
+    fileSizeEl.textContent = sizeText;
+    infoSize.textContent = sizeText;
+
+    // 文件链接
+    infoUrl.textContent = FILE_URL ? FILE_URL.substring(0, 80) + (FILE_URL.length > 80 ? '...' : '') : '-';
+
+    // 缓存状态
+    if (isFileCached) {
+        statusTip.textContent = '✅ 文件已缓存，可直接打开';
+        statusTip.className = 'status-tip cached';
+        infoCacheStatus.textContent = '✅ 已缓存';
+        mainBtn.textContent = '📂 打开文件';
+        mainBtn.className = 'btn btn-success';
+        cacheBtn.style.display = 'block';
+    } else {
+        statusTip.textContent = '📥 文件未缓存，点击下载后自动保存';
+        statusTip.className = 'status-tip';
+        infoCacheStatus.textContent = '⏳ 未缓存';
+        mainBtn.textContent = '📥 下载文件';
+        mainBtn.className = 'btn btn-primary';
+        cacheBtn.style.display = 'none';
+    }
+}
+
+// ============================================================
+// 重置 UI（下载完成后）
+// ============================================================
+function resetUI() {
+    isDownloading = false;
+    mainBtn.disabled = false;
+    loading.classList.remove('active');
+    progressBar.classList.remove('active');
+    progressFill.style.width = '0%';
+    if (window._progressInterval) {
+        clearInterval(window._progressInterval);
+        window._progressInterval = null;
+    }
+    updateUI();
+}
+
+// ============================================================
+// 事件绑定
+// ============================================================
+mainBtn.addEventListener('click', function() {
+    if (isFileCached) {
+        openFile();
+    } else {
+        downloadFile();
+    }
+});
+
+cacheBtn.addEventListener('click', clearCache);
+
+// ============================================================
+// 页面初始化
+// ============================================================
+async function init() {
+    // 检查缓存状态
+    await checkFileCached();
+    updateUI();
+    
+    // 如果 URL 无效，禁用按钮
+    if (!FILE_URL) {
+        mainBtn.disabled = true;
+        mainBtn.textContent = '❌ 文件链接无效';
+        statusTip.textContent = '⚠️ 文件链接缺失，请联系管理员';
+        statusTip.className = 'status-tip';
+        showToast('文件链接无效', 'error');
+    } else {
+        showToast('页面加载完成', 'info', 1500);
+    }
+}
+
+// 页面加载完成后初始化
+if (document.readyState === 'complete') {
+    init();
+} else {
+    window.addEventListener('load', init);
+}
+
+// ============================================================
+// 监听小程序端消息（H5 接收小程序的回调）
+// ============================================================
+// 注意：这是 H5 页面内监听，实际接收消息需要通过小程序的 WebView 组件的 @message 事件
+// 这里提供一种通过 uni 全局事件的方式（需要小程序端配合）
+
+// 如果有 uni 环境，监听全局事件
+if (window.uni) {
+    // 示例：监听下载完成事件
+    window.addEventListener('message', function(event) {
+        const data = event.data;
+        if (data && data.type === 'downloadComplete') {
+            // 下载完成
+            isFileCached = true;
+            cachedFilePath = data.filePath;
+            const cacheKey = 'file_cached_' + encodeURIComponent(FILE_URL);
+            localStorage.setItem(cacheKey, 'true');
+            resetUI();
+            showToast('文件下载完成！', 'success');
+        } else if (data && data.type === 'downloadProgress') {
+            // 更新进度
+            const progress = data.progress || 0;
+            progressFill.style.width = Math.min(progress, 100) + '%';
+            loadingText.textContent = `下载中 ${Math.round(progress)}%`;
+        } else if (data && data.type === 'downloadError') {
+            // 下载失败
+            resetUI();
+            showToast('下载失败：' + (data.error || '未知错误'), 'error');
+        }
+    });
+}
+
+console.log('📄 WebView 文件预览页面已加载');
+console.log('📎 文件URL:', FILE_URL);
+console.log('📝 文件名:', FILE_NAME);
+console.log('📊 文件大小:', FILE_SIZE);
+</script>
+</body>
+</html>
