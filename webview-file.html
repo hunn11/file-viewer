@@ -540,7 +540,7 @@
                     loadingText.textContent = `下载中 ${Math.round(progress)}%`;
                 }
             }, 300);
-            const BASE_URL = 'http://192.168.0.34:5101/';  // ← 换成你的后端域名
+            const BASE_URL = 'https://192.168.0.34:5101/'; 
             const FILE_URL = BASE_URL + (urlParams.get('url') || '');
 
             console.log('最终请求URL:', FILE_URL);
