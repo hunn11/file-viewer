@@ -346,7 +346,7 @@
                 <span class="info-value" id="infoName">-</span>
             </div>
             <div class="info-row">
-                <span class="info-label">文件</span>
+                <span class="info-label">文件大小</span>
                 <span class="info-value" id="infoSize">-</span>
             </div>
             <div class="info-row">
@@ -362,9 +362,6 @@
     </div>
 
     <script>
-        // ============================================================
-        // 配置区 - 从 URL 参数读取文件信息
-        // ============================================================
         const urlParams = new URLSearchParams(window.location.search);
         const FILE_URL = urlParams.get('url') || '';
         const FILE_NAME = urlParams.get('name') || '未知文件';
@@ -377,9 +374,6 @@
         let downloadTask = null;          // 下载任务引用
         let isDownloading = false;        // 是否正在下载
 
-        // ============================================================
-        // DOM 引用
-        // ============================================================
         const $ = (id) => document.getElementById(id);
         const fileNameEl = $('fileName');
         const fileSizeEl = $('fileSize');
@@ -396,9 +390,6 @@
         const infoUrl = $('infoUrl');
         const toast = $('toast');
 
-        // ============================================================
-        // 工具函数
-        // ============================================================
         function formatSize(bytes) {
             if (!bytes || bytes === 0) return '未知大小';
             const units = ['B', 'KB', 'MB', 'GB'];
@@ -422,9 +413,6 @@
             }, duration);
         }
 
-        // ============================================================
-        // 核心：检查文件是否已缓存（通过小程序 API）
-        // ============================================================
         function checkFileCached() {
             return new Promise((resolve) => {
                 // 检查是否有小程序环境
@@ -434,9 +422,6 @@
                     return;
                 }
 
-                // 通过 UniApp 的桥接能力检查文件是否存在
-                // 注意：这里需要配合小程序端 WebView 的 postMessage 能力
-                // 但简化方案：尝试通过 document.cookie 或 localStorage 记录缓存状态
                 const cacheKey = 'file_cached_' + encodeURIComponent(FILE_URL);
                 const cached = localStorage.getItem(cacheKey);
                 if (cached === 'true') {
@@ -448,9 +433,6 @@
             });
         }
 
-        // ============================================================
-        // 核心：发起下载（触发小程序下载）
-        // ============================================================
         function downloadFile() {
             if (isDownloading) {
                 showToast('正在下载中，请稍候...', 'info');
@@ -477,97 +459,28 @@
                 type: FILE_TYPE
             };
 
-            // 安全地尝试发送消息
             let messageSent = false;
 
-            try {
-                // 方式1：检查 uni 环境
-                if (typeof uni !== 'undefined' && uni.postMessage && typeof uni.postMessage === 'function') {
-                    uni.postMessage({
-                        data: {
-                            action: 'downloadFile',
-                            params: downloadParams
-                        }
-                    });
-                    messageSent = true;
-                    console.log('📤 通过 uni.postMessage 发送下载请求');
-                }
-            } catch (e) {
-                console.warn('uni.postMessage 调用失败:', e);
-            }
+            directDownload(FILE_URL, FILE_NAME);
 
-            if (!messageSent) {
-                try {
-                    // 方式2：检查微信小程序环境
-                    if (typeof wx !== 'undefined' && wx.miniProgram && wx.miniProgram.postMessage && typeof wx.miniProgram.postMessage === 'function') {
-                        wx.miniProgram.postMessage({
-                            data: {
-                                action: 'downloadFile',
-                                params: downloadParams
-                            }
-                        });
-                        messageSent = true;
-                        console.log('📤 通过 wx.miniProgram.postMessage 发送下载请求');
-                    }
-                } catch (e) {
-                    console.warn('wx.miniProgram.postMessage 调用失败:', e);
-                }
-            }
-
-            if (!messageSent) {
-                // 方式3：都失败了，降级为直接下载（浏览器环境）
-                console.warn('⚠️ 无法通过 postMessage 通信，降级为直接下载');
-                showToast('正在尝试直接下载...', 'info');
-                directDownload(FILE_URL, FILE_NAME);
-                // 注意：这里需要重置 UI，因为 directDownload 会调用 resetUI
-                return;
-            }
-
-            // 只有通过 postMessage 成功发送后，才显示进度模拟
-            showToast('已通知小程序下载', 'info');
-            simulateProgress();
         }
-        // ============================================================
-        // 模拟下载进度（实际进度由小程序端实时反馈）
-        // ============================================================
-        function simulateProgress() {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 15 + 5;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                    // 下载完成由小程序端回调通知
-                }
-                progressFill.style.width = Math.min(progress, 95) + '%';
-            }, 500);
-            // 存储 interval 以便取消
-            window._progressInterval = interval;
-        }
+        
 
-        // ============================================================
-        // 直接下载（非小程序环境兜底）
-        // ============================================================
-         function directDownload(url, filename) {
-             console.log(“立即下载”,directDownload);
+        function directDownload(url, filename) {
             fetch(url)
                 .then(res => res.blob())
                 .then(blob => {
                     const blobUrl = URL.createObjectURL(blob);
-
-                    // ① 先下载到本地
                     const a = document.createElement('a');
                     a.href = blobUrl;
                     a.download = filename || 'file';
                     a.click();
 
-                    // ② 立刻预览（不跳转页面）
                     const iframe = document.createElement('iframe');
                     iframe.src = blobUrl;
                     iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:9999;background:#fff';
                     document.body.appendChild(iframe);
 
-                    // 3秒后自动关闭预览
                     setTimeout(() => {
                         iframe.remove();
                         URL.revokeObjectURL(blobUrl);
@@ -579,79 +492,7 @@
         }
 
 
-        // ============================================================
-        // 打开文件（通过小程序 API）
-        // ============================================================
-        function openFile() {
-            if (!isFileCached) {
-                showToast('文件尚未缓存，请先下载', 'error');
-                return;
-            }
 
-            // 通知小程序打开文件
-            const openParams = {
-                filePath: cachedFilePath,
-                name: FILE_NAME
-            };
-
-            if (window.uni && uni.postMessage) {
-                uni.postMessage({
-                    data: {
-                        action: 'openFile',
-                        params: openParams
-                    }
-                });
-            } else if (window.wx && wx.miniProgram) {
-                wx.miniProgram.postMessage({
-                    data: {
-                        action: 'openFile',
-                        params: openParams
-                    }
-                });
-            } else {
-                // 兜底：直接尝试打开链接
-                window.open(FILE_URL, '_blank');
-            }
-            showToast('正在打开文件...', 'info');
-        }
-
-        // ============================================================
-        // 清除缓存
-        // ============================================================
-        function clearCache() {
-            if (!isFileCached) {
-                showToast('没有缓存可清除', 'info');
-                return;
-            }
-
-            if (window.uni && uni.postMessage) {
-                uni.postMessage({
-                    data: {
-                        action: 'clearCache',
-                        params: { filePath: cachedFilePath, url: FILE_URL }
-                    }
-                });
-            } else if (window.wx && wx.miniProgram) {
-                wx.miniProgram.postMessage({
-                    data: {
-                        action: 'clearCache',
-                        params: { filePath: cachedFilePath, url: FILE_URL }
-                    }
-                });
-            }
-
-            // 本地清除记录
-            const cacheKey = 'file_cached_' + encodeURIComponent(FILE_URL);
-            localStorage.removeItem(cacheKey);
-            isFileCached = false;
-            cachedFilePath = null;
-            updateUI();
-            showToast('缓存已清除', 'success');
-        }
-
-        // ============================================================
-        // 更新 UI
-        // ============================================================
         function updateUI() {
             // 文件名
             fileNameEl.textContent = FILE_NAME || '未知文件';
@@ -683,9 +524,6 @@
             }
         }
 
-        // ============================================================
-        // 重置 UI（下载完成后）
-        // ============================================================
         function resetUI() {
             isDownloading = false;
             mainBtn.disabled = false;
@@ -699,9 +537,6 @@
             updateUI();
         }
 
-        // ============================================================
-        // 事件绑定
-        // ============================================================
         mainBtn.addEventListener('click', function () {
             if (isFileCached) {
                 openFile();
@@ -712,9 +547,6 @@
 
         cacheBtn.addEventListener('click', clearCache);
 
-        // ============================================================
-        // 页面初始化
-        // ============================================================
         async function init() {
             // 检查缓存状态
             await checkFileCached();
@@ -739,13 +571,6 @@
             window.addEventListener('load', init);
         }
 
-        // ============================================================
-        // 监听小程序端消息（H5 接收小程序的回调）
-        // ============================================================
-        // 注意：这是 H5 页面内监听，实际接收消息需要通过小程序的 WebView 组件的 @message 事件
-        // 这里提供一种通过 uni 全局事件的方式（需要小程序端配合）
-
-        // 如果有 uni 环境，监听全局事件
         if (window.uni) {
             // 示例：监听下载完成事件
             window.addEventListener('message', function (event) {
@@ -770,11 +595,6 @@
                 }
             });
         }
-
-        console.log('📄 WebView 文件预览页面已加载');
-        console.log('📎 文件URL:', FILE_URL);
-        console.log('📝 文件名:', FILE_NAME);
-        console.log('📊 文件大小:', FILE_SIZE);
     </script>
 </body>
 
