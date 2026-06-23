@@ -6,23 +6,23 @@
     <title>文件预览</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding: 20px; min-height: 100vh; }
-        .container { max-width: 600px; margin: 0 auto; }
-        .card { background: white; border-radius: 16px; padding: 30px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 16px; }
-        .file-icon { width: 72px; height: 72px; border-radius: 16px; background: #e8f4fd; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; }
-        .file-name { text-align: center; font-size: 18px; font-weight: 600; color: #1a2332; word-break: break-all; margin-bottom: 8px; }
-        .file-size { text-align: center; font-size: 14px; color: #8c9aa8; margin-bottom: 20px; }
-        .status-tip { text-align: center; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; background: #f0f2f5; color: #606266; }
-        .status-tip.cached { background: #e8f8ee; color: #1aad5f; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 500px; width: 100%; margin: 0 auto; }
+        .card { background: white; border-radius: 16px; padding: 40px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center; }
+        .file-icon { width: 80px; height: 80px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 16px; }
+        .file-name { font-size: 18px; font-weight: 600; color: #1a2332; word-break: break-all; margin-bottom: 8px; }
+        .file-size { font-size: 14px; color: #8c9aa8; margin-bottom: 20px; }
+        .status-tip { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; background: #f0f2f5; color: #606266; }
+        .status-tip.loading { background: #fff3e0; color: #e6a23c; }
+        .status-tip.success { background: #e8f8ee; color: #1aad5f; }
         .status-tip.error { background: #fef0f0; color: #f56c6c; }
-        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; margin-bottom: 10px; transition: all 0.3s; }
+        .status-tip.cached { background: #e8f4fd; color: #2b7de9; }
+        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.3s; }
         .btn-primary { background: #2b7de9; color: white; }
         .btn-primary:hover { background: #1a6ad5; }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-success { background: #1aad5f; color: white; }
         .btn-success:hover { background: #159a52; }
-        .btn-outline { background: white; color: #2b7de9; border: 1px solid #2b7de9; }
-        .btn-outline:hover { background: #f0f7ff; }
         .loading { display: none; text-align: center; padding: 12px; color: #8c9aa8; font-size: 14px; }
         .loading.active { display: block; }
         .loading .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e0e6ed; border-top-color: #2b7de9; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
@@ -43,16 +43,13 @@
         .preview-body .placeholder span { font-size: 16px; color: #909399; margin-top: 12px; }
         .preview-footer { display: flex; justify-content: center; padding: 12px 16px; background: #f8f9fc; border-top: 1px solid #e8ecf0; flex-shrink: 0; gap: 12px; }
         .preview-footer .btn { width: auto; padding: 10px 24px; margin: 0; }
-        .btn-group { display: flex; gap: 10px; flex-direction: column; }
-        .btn-group .btn { margin: 0; }
-        @media (min-width: 400px) {
-            .btn-group { flex-direction: row; }
-            .btn-group .btn { flex: 1; }
-        }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div id="toast" class="toast"></div>
+    
+    <!-- 预览弹窗 -->
     <div class="preview-overlay" id="previewOverlay">
         <div class="preview-header">
             <span class="title" id="previewTitle">文件预览</span>
@@ -66,61 +63,67 @@
         </div>
         <div class="preview-footer">
             <button class="btn btn-primary" id="downloadInlineBtn">📥 下载文件</button>
-            <button class="btn btn-outline" id="openInBrowserBtn">🌐 浏览器打开</button>
         </div>
     </div>
+
+    <!-- 主界面 -->
     <div class="container">
         <div class="card">
             <div class="file-icon">📄</div>
             <div class="file-name" id="fileName">文件名称</div>
             <div class="file-size" id="fileSize">未知大小</div>
-            <div class="status-tip" id="statusTip">💡 点击下方按钮下载或预览</div>
+            <div class="status-tip" id="statusTip">⏳ 准备加载...</div>
             <div class="loading" id="loading"><span class="spinner"></span><span id="loadingText">加载中...</span></div>
-            <div class="btn-group">
-                <button class="btn btn-primary" id="mainBtn">📥 下载文件</button>
-                <button class="btn btn-success" id="previewBtn">👁️ 预览文件</button>
-            </div>
+            <button class="btn btn-primary hidden" id="retryBtn">🔄 重新加载</button>
         </div>
     </div>
+
     <script>
-        // ✅ 获取 URL 参数
+        // ==================== 配置 ====================
+        const CONFIG = {
+            // ✅ 接口地址
+            BASE_URL: 'https://xglwx.siglenlift.cn/testfile/',
+            // 缓存 key
+            CACHE_KEY: 'cached_file_data',
+            CACHE_META_KEY: 'cached_file_meta',
+        };
+
+        // ==================== 获取参数 ====================
         const urlParams = new URLSearchParams(window.location.search);
-        const FILE_URL_PATH = urlParams.get('url') || '';
+        const FILE_PATH = urlParams.get('url') || '';
         const FILE_NAME = urlParams.get('name') || '未知文件';
         const FILE_SIZE = parseInt(urlParams.get('size')) || 0;
         const TOKEN = urlParams.get('token') || '';
 
-        console.log('📁 文件路径:', FILE_URL_PATH);
-        console.log('🔑 Token:', TOKEN ? TOKEN.substring(0, 20) + '...' : '无');
-        console.log('📄 文件名:', FILE_NAME);
+        // 完整 URL
+        const FILE_URL = CONFIG.BASE_URL + FILE_PATH;
 
-        const BASE_URL = window.location.origin;  // ✅ 使用当前域名
-        const FILE_URL = BASE_URL + FILE_URL_PATH;
-
+        console.log('📁 文件路径:', FILE_PATH);
         console.log('🌐 完整URL:', FILE_URL);
+        console.log('🔑 Token:', TOKEN ? '有' : '无');
 
-        let currentBlobUrl = null;
-        let currentBlob = null;
-        let isDownloading = false;
-
-        // DOM 引用
+        // ==================== DOM 引用 ====================
         const $ = (id) => document.getElementById(id);
         const fileNameEl = $('fileName');
         const fileSizeEl = $('fileSize');
         const statusTip = $('statusTip');
         const loading = $('loading');
         const loadingText = $('loadingText');
-        const mainBtn = $('mainBtn');
-        const previewBtn = $('previewBtn');
+        const retryBtn = $('retryBtn');
         const toast = $('toast');
         const previewOverlay = $('previewOverlay');
         const previewBody = $('previewBody');
         const previewTitle = $('previewTitle');
         const closePreview = $('closePreview');
         const downloadInlineBtn = $('downloadInlineBtn');
-        const openInBrowserBtn = $('openInBrowserBtn');
 
-        // Toast 提示
+        // ==================== 状态 ====================
+        let currentBlobUrl = null;
+        let currentBlob = null;
+        let isDownloading = false;
+
+        // ==================== 工具函数 ====================
+
         function showToast(msg, type = 'info') {
             toast.textContent = msg;
             toast.className = 'toast ' + type;
@@ -130,7 +133,6 @@
             toast._timer = setTimeout(() => toast.classList.remove('show'), 2500);
         }
 
-        // 格式化文件大小
         function formatSize(bytes) {
             if (!bytes || bytes <= 0) return '未知大小';
             const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -142,28 +144,117 @@
             return bytes.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
         }
 
-        // 🔥 核心：下载文件
-        function downloadFile(showLoading = true) {
-            if (isDownloading) return Promise.reject('下载中');
+        function setStatus(text, type = 'info') {
+            statusTip.textContent = text;
+            statusTip.className = 'status-tip ' + type;
+        }
+
+        function showLoading(show, text = '加载中...') {
+            if (show) {
+                loading.classList.add('active');
+                loadingText.textContent = text;
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        // ==================== 缓存操作 ====================
+
+        function saveToCache(blob, fileName, fileSize) {
+            try {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    const cacheData = {
+                        data: base64,
+                        fileName: fileName,
+                        fileSize: fileSize,
+                        timestamp: Date.now(),
+                        url: FILE_URL
+                    };
+                    localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(cacheData));
+                    console.log('💾 已缓存到 localStorage');
+                };
+                reader.readAsDataURL(blob);
+            } catch (err) {
+                console.warn('缓存失败:', err);
+            }
+        }
+
+        function getFromCache() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (!cached) return null;
+                const data = JSON.parse(cached);
+                // 检查是否是同一个文件
+                if (data.url !== FILE_URL) {
+                    console.log('📝 文件不同，重新下载');
+                    return null;
+                }
+                // 检查缓存是否过期（7天）
+                const age = Date.now() - data.timestamp;
+                const maxAge = 7 * 24 * 60 * 60 * 1000;
+                if (age > maxAge) {
+                    console.log('⏰ 缓存已过期');
+                    localStorage.removeItem(CONFIG.CACHE_KEY);
+                    return null;
+                }
+                return data;
+            } catch (err) {
+                console.warn('读取缓存失败:', err);
+                return null;
+            }
+        }
+
+        function loadFromCache(cacheData) {
+            try {
+                const base64 = cacheData.data;
+                const blob = dataURLToBlob(base64);
+                currentBlob = blob;
+                currentBlobUrl = URL.createObjectURL(blob);
+                
+                setStatus('✅ 已从缓存加载', 'cached');
+                showLoading(false);
+                
+                console.log('📦 从缓存加载成功');
+                return true;
+            } catch (err) {
+                console.error('缓存加载失败:', err);
+                return false;
+            }
+        }
+
+        function dataURLToBlob(dataURL) {
+            const arr = dataURL.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], { type: mime });
+        }
+
+        // ==================== 核心：下载文件 ====================
+
+        function downloadFile() {
+            if (isDownloading) return;
             if (!FILE_URL) {
-                showToast('文件地址无效', 'error');
-                return Promise.reject('无URL');
+                setStatus('❌ 文件地址无效', 'error');
+                return;
             }
 
             isDownloading = true;
-            if (showLoading) {
-                mainBtn.disabled = true;
-                mainBtn.textContent = '⏳ 下载中...';
-                loading.classList.add('active');
-                loadingText.textContent = '正在下载...';
-            }
+            showLoading(true, '正在下载...');
+            setStatus('⏳ 下载中...', 'loading');
 
             const headers = {};
             if (TOKEN) {
                 headers['Authorization'] = `Bearer ${TOKEN}`;
             }
 
-            return fetch(FILE_URL, { headers })
+            fetch(FILE_URL, { headers })
                 .then(res => {
                     if (!res.ok) {
                         throw new Error(`请求失败 (${res.status})`);
@@ -175,36 +266,32 @@
                     currentBlob = blob;
                     currentBlobUrl = URL.createObjectURL(blob);
                     
-                    if (showLoading) {
-                        loading.classList.remove('active');
-                        showToast('✅ 下载完成', 'success');
-                        statusTip.textContent = '✅ 文件已缓存，可预览或下载';
-                        statusTip.className = 'status-tip cached';
-                    }
-                    return blob;
+                    // 保存到缓存
+                    saveToCache(blob, FILE_NAME, blob.size);
+                    
+                    showLoading(false);
+                    setStatus('✅ 下载完成', 'success');
+                    showToast('✅ 下载完成，自动打开', 'success');
+                    
+                    // ✅ 自动打开预览
+                    openPreview();
                 })
                 .catch(err => {
-                    if (showLoading) {
-                        loading.classList.remove('active');
-                        showToast('❌ 下载失败: ' + err.message, 'error');
-                        statusTip.textContent = '❌ 下载失败，请检查网络或联系管理员';
-                        statusTip.className = 'status-tip error';
-                    }
-                    throw err;
+                    showLoading(false);
+                    setStatus('❌ 下载失败: ' + err.message, 'error');
+                    showToast('❌ 下载失败', 'error');
+                    retryBtn.classList.remove('hidden');
                 })
                 .finally(() => {
                     isDownloading = false;
-                    if (showLoading) {
-                        mainBtn.disabled = false;
-                        mainBtn.textContent = '📥 下载文件';
-                    }
                 });
         }
 
-        // 🔥 打开预览
+        // ==================== 预览 ====================
+
         function openPreview() {
             if (!currentBlobUrl || !currentBlob) {
-                showToast('请先下载文件', 'error');
+                showToast('文件未加载', 'error');
                 return;
             }
 
@@ -212,30 +299,19 @@
             previewTitle.textContent = FILE_NAME;
             previewBody.innerHTML = '';
 
-            // 图片预览
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
-                const img = document.createElement('img');
-                img.src = currentBlobUrl;
-                img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
-                previewBody.appendChild(img);
-            }
-            // PDF 预览
-            else if (ext === 'pdf') {
+            // PDF 预览（使用 iframe）
+            if (ext === 'pdf') {
                 const iframe = document.createElement('iframe');
                 iframe.src = currentBlobUrl;
                 iframe.style.cssText = 'width:100%;height:100%;border:none;';
                 previewBody.appendChild(iframe);
             }
-            // 文本预览
-            else if (['txt', 'json', 'xml', 'csv', 'log'].includes(ext)) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const pre = document.createElement('pre');
-                    pre.style.cssText = 'padding:20px;font-size:14px;white-space:pre-wrap;word-break:break-all;margin:0;';
-                    pre.textContent = e.target.result;
-                    previewBody.appendChild(pre);
-                };
-                reader.readAsText(currentBlob);
+            // 图片预览
+            else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+                const img = document.createElement('img');
+                img.src = currentBlobUrl;
+                img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+                previewBody.appendChild(img);
             }
             // 视频预览
             else if (['mp4', 'webm', 'ogg', 'mov'].includes(ext)) {
@@ -258,7 +334,7 @@
                 previewBody.innerHTML = `
                     <div class="placeholder">
                         📄
-                        <span>暂不支持预览此类型文件 (.${ext})</span>
+                        <span>暂不支持预览 .${ext} 文件</span>
                         <span style="font-size:13px;color:#c0c4cc;margin-top:4px;">请点击下载查看</span>
                     </div>
                 `;
@@ -267,10 +343,11 @@
             previewOverlay.classList.add('active');
         }
 
-        // 🔥 下载当前文件（从预览弹窗）
+        // ==================== 下载当前文件 ====================
+
         function downloadCurrentFile() {
             if (!currentBlobUrl) {
-                showToast('请先下载文件', 'error');
+                showToast('文件未加载', 'error');
                 return;
             }
             const a = document.createElement('a');
@@ -282,64 +359,57 @@
             showToast('📥 下载已开始', 'success');
         }
 
-        // 🔥 在浏览器中打开
-        function openInBrowser() {
-            if (!FILE_URL) {
-                showToast('文件地址无效', 'error');
-                return;
-            }
-            window.open(FILE_URL, '_blank');
-        }
-
         // ==================== 事件绑定 ====================
-        
-        // 主按钮：下载
-        mainBtn.addEventListener('click', () => {
-            downloadFile(true);
-        });
 
-        // 预览按钮：先下载再预览
-        previewBtn.addEventListener('click', () => {
-            if (currentBlobUrl && currentBlob) {
-                openPreview();
-            } else {
-                showToast('正在下载文件...', 'info');
-                downloadFile(true)
-                    .then(() => openPreview())
-                    .catch(() => {});
-            }
-        });
-
-        // 关闭预览
         closePreview.addEventListener('click', () => {
             previewOverlay.classList.remove('active');
         });
 
-        // 点击遮罩关闭预览（点击背景）
         previewOverlay.addEventListener('click', (e) => {
             if (e.target === previewOverlay) {
                 previewOverlay.classList.remove('active');
             }
         });
 
-        // 预览弹窗中的下载按钮
         downloadInlineBtn.addEventListener('click', downloadCurrentFile);
 
-        // 浏览器打开
-        openInBrowserBtn.addEventListener('click', openInBrowser);
+        retryBtn.addEventListener('click', () => {
+            retryBtn.classList.add('hidden');
+            downloadFile();
+        });
 
         // ==================== 初始化 ====================
-        
-        fileNameEl.textContent = FILE_NAME;
-        fileSizeEl.textContent = formatSize(FILE_SIZE);
 
-        // 如果有 token，显示状态
-        if (TOKEN) {
-            statusTip.textContent = '🔐 已认证，点击下载文件';
+        function init() {
+            fileNameEl.textContent = FILE_NAME;
+            fileSizeEl.textContent = formatSize(FILE_SIZE);
+
+            // ✅ 检查缓存
+            const cached = getFromCache();
+            if (cached) {
+                console.log('📦 发现缓存，直接加载');
+                setStatus('📦 从缓存加载...', 'cached');
+                showLoading(true, '从缓存加载...');
+                
+                const success = loadFromCache(cached);
+                if (success) {
+                    showLoading(false);
+                    setStatus('✅ 已从缓存加载', 'cached');
+                    // ✅ 自动打开预览
+                    setTimeout(() => openPreview(), 300);
+                    return;
+                }
+            }
+
+            // 没有缓存或缓存失效，直接下载
+            console.log('📥 无缓存，开始下载');
+            setTimeout(downloadFile, 500);
         }
 
+        // 启动
+        init();
+
         console.log('🚀 页面初始化完成');
-        console.log('📦 文件大小:', formatSize(FILE_SIZE));
     </script>
 </body>
 </html>
