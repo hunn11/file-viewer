@@ -91,7 +91,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const FILE_PATH = urlParams.get('url') || '';
         const FILE_NAME = urlParams.get('name') || '未知文件';
-        const FILE_SIZE = parseInt(urlParams.get('size')) || 0;
+        
         const TOKEN = urlParams.get('token') || '';
 
         // 完整 URL
@@ -389,7 +389,6 @@ function getFromCache() {
 
         function init() {
             fileNameEl.textContent = FILE_NAME;
-            fileSizeEl.textContent = formatSize(FILE_SIZE);
 
             // ✅ 检查缓存
             const cached = getFromCache();
