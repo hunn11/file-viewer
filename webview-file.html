@@ -12,11 +12,17 @@
         .file-icon { width: 72px; height: 72px; border-radius: 16px; background: #e8f4fd; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; }
         .file-name { text-align: center; font-size: 18px; font-weight: 600; color: #1a2332; word-break: break-all; margin-bottom: 8px; }
         .file-size { text-align: center; font-size: 14px; color: #8c9aa8; margin-bottom: 20px; }
-        .status-tip { text-align: center; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+        .status-tip { text-align: center; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; background: #f0f2f5; color: #606266; }
         .status-tip.cached { background: #e8f8ee; color: #1aad5f; }
-        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; margin-bottom: 10px; }
+        .status-tip.error { background: #fef0f0; color: #f56c6c; }
+        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 500; cursor: pointer; margin-bottom: 10px; transition: all 0.3s; }
         .btn-primary { background: #2b7de9; color: white; }
+        .btn-primary:hover { background: #1a6ad5; }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-success { background: #1aad5f; color: white; }
+        .btn-success:hover { background: #159a52; }
+        .btn-outline { background: white; color: #2b7de9; border: 1px solid #2b7de9; }
+        .btn-outline:hover { background: #f0f7ff; }
         .loading { display: none; text-align: center; padding: 12px; color: #8c9aa8; font-size: 14px; }
         .loading.active { display: block; }
         .loading .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e0e6ed; border-top-color: #2b7de9; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
@@ -27,12 +33,22 @@
         .toast.error { background: rgba(255,107,107,0.9); }
         .preview-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: #fff; display: none; flex-direction: column; }
         .preview-overlay.active { display: flex; }
-        .preview-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8f9fc; border-bottom: 1px solid #e8ecf0; }
+        .preview-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8f9fc; border-bottom: 1px solid #e8ecf0; flex-shrink: 0; }
         .preview-header .title { font-size: 16px; font-weight: 600; color: #1a2332; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 12px; }
         .preview-header .close-btn { padding: 6px 14px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; background: #e8ecf0; color: #1a2332; }
-        .preview-body { flex: 1; overflow: auto; background: #fff; }
+        .preview-header .close-btn:hover { background: #d5dbe3; }
+        .preview-body { flex: 1; overflow: auto; background: #fff; min-height: 300px; }
         .preview-body img, .preview-body iframe { width: 100%; height: 100%; border: none; display: block; }
-        .download-btn-inline { padding: 12px 24px; background: #2b7de9; color: white; border: none; border-radius: 12px; font-size: 15px; cursor: pointer; margin: 8px 16px; }
+        .preview-body .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 48px; color: #dcdfe6; flex-direction: column; }
+        .preview-body .placeholder span { font-size: 16px; color: #909399; margin-top: 12px; }
+        .preview-footer { display: flex; justify-content: center; padding: 12px 16px; background: #f8f9fc; border-top: 1px solid #e8ecf0; flex-shrink: 0; gap: 12px; }
+        .preview-footer .btn { width: auto; padding: 10px 24px; margin: 0; }
+        .btn-group { display: flex; gap: 10px; flex-direction: column; }
+        .btn-group .btn { margin: 0; }
+        @media (min-width: 400px) {
+            .btn-group { flex-direction: row; }
+            .btn-group .btn { flex: 1; }
+        }
     </style>
 </head>
 <body>
@@ -42,39 +58,52 @@
             <span class="title" id="previewTitle">文件预览</span>
             <button class="close-btn" id="closePreview">✕ 关闭</button>
         </div>
-        <div class="preview-body" id="previewBody"></div>
-        <div class="download-btn-inline" id="downloadInlineBtn">📥 下载文件</div>
+        <div class="preview-body" id="previewBody">
+            <div class="placeholder">
+                📄
+                <span>加载中...</span>
+            </div>
+        </div>
+        <div class="preview-footer">
+            <button class="btn btn-primary" id="downloadInlineBtn">📥 下载文件</button>
+            <button class="btn btn-outline" id="openInBrowserBtn">🌐 浏览器打开</button>
+        </div>
     </div>
     <div class="container">
         <div class="card">
             <div class="file-icon">📄</div>
             <div class="file-name" id="fileName">文件名称</div>
-            <div class="status-tip" id="statusTip">#点击下方按钮下载或预览</div>
+            <div class="file-size" id="fileSize">未知大小</div>
+            <div class="status-tip" id="statusTip">💡 点击下方按钮下载或预览</div>
             <div class="loading" id="loading"><span class="spinner"></span><span id="loadingText">加载中...</span></div>
             <div class="btn-group">
                 <button class="btn btn-primary" id="mainBtn">📥 下载文件</button>
+                <button class="btn btn-success" id="previewBtn">👁️ 预览文件</button>
             </div>
         </div>
     </div>
     <script>
-        // ✅ 修复1：取出 token
+        // ✅ 获取 URL 参数
         const urlParams = new URLSearchParams(window.location.search);
         const FILE_URL_PATH = urlParams.get('url') || '';
         const FILE_NAME = urlParams.get('name') || '未知文件';
         const FILE_SIZE = parseInt(urlParams.get('size')) || 0;
-        const TOKEN = urlParams.get('token') || '';  // ✅ 取 token
+        const TOKEN = urlParams.get('token') || '';
 
-        console.log('文件路径:', FILE_URL_PATH);
-        console.log('Token:', TOKEN ? TOKEN.substring(0,10)+'...' : '无');
+        console.log('📁 文件路径:', FILE_URL_PATH);
+        console.log('🔑 Token:', TOKEN ? TOKEN.substring(0, 20) + '...' : '无');
+        console.log('📄 文件名:', FILE_NAME);
 
-        const BASE_URL = 'http://192.168.0.34:5101'; 
+        const BASE_URL = window.location.origin;  // ✅ 使用当前域名
         const FILE_URL = BASE_URL + FILE_URL_PATH;
 
-        console.log('最终请求URL:', FILE_URL);
+        console.log('🌐 完整URL:', FILE_URL);
 
         let currentBlobUrl = null;
+        let currentBlob = null;
         let isDownloading = false;
 
+        // DOM 引用
         const $ = (id) => document.getElementById(id);
         const fileNameEl = $('fileName');
         const fileSizeEl = $('fileSize');
@@ -82,99 +111,235 @@
         const loading = $('loading');
         const loadingText = $('loadingText');
         const mainBtn = $('mainBtn');
+        const previewBtn = $('previewBtn');
         const toast = $('toast');
         const previewOverlay = $('previewOverlay');
         const previewBody = $('previewBody');
         const previewTitle = $('previewTitle');
         const closePreview = $('closePreview');
         const downloadInlineBtn = $('downloadInlineBtn');
+        const openInBrowserBtn = $('openInBrowserBtn');
 
+        // Toast 提示
         function showToast(msg, type = 'info') {
             toast.textContent = msg;
             toast.className = 'toast ' + type;
             void toast.offsetWidth;
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2500);
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 2500);
         }
 
+        // 格式化文件大小
         function formatSize(bytes) {
-            if (!bytes) return '未知大小';
-            const u = ['B','KB','MB','GB'];
+            if (!bytes || bytes <= 0) return '未知大小';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
             let i = 0;
-            while (bytes >= 1024 && i < u.length-1) { bytes /= 1024; i++; }
-            return bytes.toFixed(i?1:0) + ' ' + u[i];
+            while (bytes >= 1024 && i < units.length - 1) {
+                bytes /= 1024;
+                i++;
+            }
+            return bytes.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
         }
 
-        function downloadFile() {
-            if (isDownloading || !FILE_URL) return;
+        // 🔥 核心：下载文件
+        function downloadFile(showLoading = true) {
+            if (isDownloading) return Promise.reject('下载中');
+            if (!FILE_URL) {
+                showToast('文件地址无效', 'error');
+                return Promise.reject('无URL');
+            }
+
             isDownloading = true;
-            mainBtn.disabled = true;
-            mainBtn.textContent = '⏳ 下载中...';
-            loading.classList.add('active');
-            loadingText.textContent = '正在下载...';
+            if (showLoading) {
+                mainBtn.disabled = true;
+                mainBtn.textContent = '⏳ 下载中...';
+                loading.classList.add('active');
+                loadingText.textContent = '正在下载...';
+            }
 
-            fetch(FILE_URL, {
-                headers: {
-                    'Authorization': `Bearer ${TOKEN}`  // ✅ 用取出来的 token
-                }
-            })
-            .then(res => {
-                if (!res.ok) throw new Error('请求失败: ' + res.status);
-                return res.blob();
-            })
-            .then(blob => {
-                if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
-                currentBlobUrl = URL.createObjectURL(blob);
-                loading.classList.remove('active');
-                showToast('下载完成', 'success');
-                openPreview(blob);
-            })
-            .catch(err => {
-                loading.classList.remove('active');
-                showToast('下载失败: ' + err.message, 'error');
-            });
-            isDownloading = false;
-            mainBtn.disabled = false;
+            const headers = {};
+            if (TOKEN) {
+                headers['Authorization'] = `Bearer ${TOKEN}`;
+            }
+
+            return fetch(FILE_URL, { headers })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`请求失败 (${res.status})`);
+                    }
+                    return res.blob();
+                })
+                .then(blob => {
+                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                    currentBlob = blob;
+                    currentBlobUrl = URL.createObjectURL(blob);
+                    
+                    if (showLoading) {
+                        loading.classList.remove('active');
+                        showToast('✅ 下载完成', 'success');
+                        statusTip.textContent = '✅ 文件已缓存，可预览或下载';
+                        statusTip.className = 'status-tip cached';
+                    }
+                    return blob;
+                })
+                .catch(err => {
+                    if (showLoading) {
+                        loading.classList.remove('active');
+                        showToast('❌ 下载失败: ' + err.message, 'error');
+                        statusTip.textContent = '❌ 下载失败，请检查网络或联系管理员';
+                        statusTip.className = 'status-tip error';
+                    }
+                    throw err;
+                })
+                .finally(() => {
+                    isDownloading = false;
+                    if (showLoading) {
+                        mainBtn.disabled = false;
+                        mainBtn.textContent = '📥 下载文件';
+                    }
+                });
         }
 
-        function openPreview(blob) {
+        // 🔥 打开预览
+        function openPreview() {
+            if (!currentBlobUrl || !currentBlob) {
+                showToast('请先下载文件', 'error');
+                return;
+            }
+
             const ext = FILE_NAME.split('.').pop().toLowerCase();
             previewTitle.textContent = FILE_NAME;
             previewBody.innerHTML = '';
 
-            if (['jpg','jpeg','png','gif','webp'].includes(ext)) {
+            // 图片预览
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
                 const img = document.createElement('img');
                 img.src = currentBlobUrl;
                 img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
                 previewBody.appendChild(img);
-            } else if (ext === 'pdf') {
+            }
+            // PDF 预览
+            else if (ext === 'pdf') {
                 const iframe = document.createElement('iframe');
                 iframe.src = currentBlobUrl;
                 iframe.style.cssText = 'width:100%;height:100%;border:none;';
                 previewBody.appendChild(iframe);
-            } else {
-                previewBody.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:48px;">📄</div>`;
             }
+            // 文本预览
+            else if (['txt', 'json', 'xml', 'csv', 'log'].includes(ext)) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const pre = document.createElement('pre');
+                    pre.style.cssText = 'padding:20px;font-size:14px;white-space:pre-wrap;word-break:break-all;margin:0;';
+                    pre.textContent = e.target.result;
+                    previewBody.appendChild(pre);
+                };
+                reader.readAsText(currentBlob);
+            }
+            // 视频预览
+            else if (['mp4', 'webm', 'ogg', 'mov'].includes(ext)) {
+                const video = document.createElement('video');
+                video.src = currentBlobUrl;
+                video.controls = true;
+                video.style.cssText = 'width:100%;height:100%;';
+                previewBody.appendChild(video);
+            }
+            // 音频预览
+            else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) {
+                const audio = document.createElement('audio');
+                audio.src = currentBlobUrl;
+                audio.controls = true;
+                audio.style.cssText = 'width:100%;margin-top:40%;';
+                previewBody.appendChild(audio);
+            }
+            // 其他文件
+            else {
+                previewBody.innerHTML = `
+                    <div class="placeholder">
+                        📄
+                        <span>暂不支持预览此类型文件 (.${ext})</span>
+                        <span style="font-size:13px;color:#c0c4cc;margin-top:4px;">请点击下载查看</span>
+                    </div>
+                `;
+            }
+
             previewOverlay.classList.add('active');
         }
 
+        // 🔥 下载当前文件（从预览弹窗）
         function downloadCurrentFile() {
-            if (!currentBlobUrl) return;
+            if (!currentBlobUrl) {
+                showToast('请先下载文件', 'error');
+                return;
+            }
             const a = document.createElement('a');
             a.href = currentBlobUrl;
             a.download = FILE_NAME;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            showToast('下载已开始', 'success');
+            showToast('📥 下载已开始', 'success');
         }
 
-        mainBtn.addEventListener('click', downloadFile);
-        closePreview.addEventListener('click', () => previewOverlay.classList.remove('active'));
+        // 🔥 在浏览器中打开
+        function openInBrowser() {
+            if (!FILE_URL) {
+                showToast('文件地址无效', 'error');
+                return;
+            }
+            window.open(FILE_URL, '_blank');
+        }
+
+        // ==================== 事件绑定 ====================
+        
+        // 主按钮：下载
+        mainBtn.addEventListener('click', () => {
+            downloadFile(true);
+        });
+
+        // 预览按钮：先下载再预览
+        previewBtn.addEventListener('click', () => {
+            if (currentBlobUrl && currentBlob) {
+                openPreview();
+            } else {
+                showToast('正在下载文件...', 'info');
+                downloadFile(true)
+                    .then(() => openPreview())
+                    .catch(() => {});
+            }
+        });
+
+        // 关闭预览
+        closePreview.addEventListener('click', () => {
+            previewOverlay.classList.remove('active');
+        });
+
+        // 点击遮罩关闭预览（点击背景）
+        previewOverlay.addEventListener('click', (e) => {
+            if (e.target === previewOverlay) {
+                previewOverlay.classList.remove('active');
+            }
+        });
+
+        // 预览弹窗中的下载按钮
         downloadInlineBtn.addEventListener('click', downloadCurrentFile);
 
+        // 浏览器打开
+        openInBrowserBtn.addEventListener('click', openInBrowser);
+
+        // ==================== 初始化 ====================
+        
         fileNameEl.textContent = FILE_NAME;
         fileSizeEl.textContent = formatSize(FILE_SIZE);
+
+        // 如果有 token，显示状态
+        if (TOKEN) {
+            statusTip.textContent = '🔐 已认证，点击下载文件';
+        }
+
+        console.log('🚀 页面初始化完成');
+        console.log('📦 文件大小:', formatSize(FILE_SIZE));
     </script>
 </body>
 </html>
