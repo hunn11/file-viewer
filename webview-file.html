@@ -81,7 +81,6 @@
     <script>
         // ==================== 配置 ====================
         const CONFIG = {
-            CORS_PROXY: 'https://api.allorigins.win/raw?url=',
             // ✅ 接口地址
             BASE_URL: 'https://xglwx.siglenlift.cn/testfile/',
             // 缓存 key
@@ -249,16 +248,13 @@
             isDownloading = true;
             showLoading(true, '正在下载...');
             setStatus('⏳ 下载中...', 'loading');
-            
+
             const headers = {};
             if (TOKEN) {
                 headers['Authorization'] = `Bearer ${TOKEN}`;
             }
 
-            const proxyUrl = CONFIG.CORS_PROXY + encodeURIComponent(FILE_URL);
-            console.log('🌐 代理 URL:', proxyUrl);
-
-            fetch(proxyUrl, { headers })
+            fetch(FILE_URL, { headers })
                 .then(res => {
                     if (!res.ok) {
                         throw new Error(`请求失败 (${res.status})`);
