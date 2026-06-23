@@ -47,8 +47,8 @@
         const FILE_NAME = urlParams.get('name') || '未知文件';
         const TOKEN = urlParams.get('token') || '';
 
-        // ✅ 接口地址
-        const BASE_URL = 'https://xglwx.siglenlift.cn/preview';
+        // ✅ 修复：文件在 testfile 目录下
+        const BASE_URL = 'https://xglwx.siglenlift.cn/testfile';
         const FILE_URL = BASE_URL + FILE_PATH;
 
         console.log('📁 文件路径:', FILE_PATH);
@@ -81,7 +81,6 @@
             // ✅ 通过 URL 参数传递 token
             let pdfUrl = FILE_URL;
             if (TOKEN) {
-                // 如果 URL 已经有参数，用 & 连接，否则用 ?
                 const connector = FILE_URL.includes('?') ? '&' : '?';
                 pdfUrl += connector + 'token=' + encodeURIComponent(TOKEN);
             }
