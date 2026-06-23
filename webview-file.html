@@ -37,8 +37,10 @@
         .preview-header .title { font-size: 16px; font-weight: 600; color: #1a2332; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 12px; }
         .preview-header .close-btn { padding: 6px 14px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; background: #e8ecf0; color: #1a2332; }
         .preview-header .close-btn:hover { background: #d5dbe3; }
-        .preview-body { flex: 1; overflow: auto; background: #fff; min-height: 300px; }
+        .preview-body { flex: 1; overflow: auto; background: #fff; min-height: 300px; -webkit-overflow-scrolling: touch; }
         .preview-body img, .preview-body iframe { width: 100%; height: 100%; border: none; display: block; }
+        .preview-body iframe {  width: 100%;  height: 100%; min-height: 100vh;  border: none;  display: block; overflow: auto !important; -webkit-overflow-scrolling: touch !important;
+}
         .preview-body .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 48px; color: #dcdfe6; flex-direction: column; }
         .preview-body .placeholder span { font-size: 16px; color: #909399; margin-top: 12px; }
         .preview-footer { display: flex; justify-content: center; padding: 12px 16px; background: #f8f9fc; border-top: 1px solid #e8ecf0; flex-shrink: 0; gap: 12px; }
@@ -60,9 +62,6 @@
                 📄
                 <span>加载中...</span>
             </div>
-        </div>
-        <div class="preview-footer">
-            <button class="btn btn-primary" id="downloadInlineBtn">📥 下载文件</button>
         </div>
     </div>
 
@@ -114,7 +113,6 @@
         const previewBody = $('previewBody');
         const previewTitle = $('previewTitle');
         const closePreview = $('closePreview');
-        const downloadInlineBtn = $('downloadInlineBtn');
 
         // ==================== 状态 ====================
         let currentBlobUrl = null;
@@ -378,7 +376,6 @@ function getFromCache() {
             }
         });
 
-        downloadInlineBtn.addEventListener('click', downloadCurrentFile);
 
         retryBtn.addEventListener('click', () => {
             retryBtn.classList.add('hidden');
