@@ -18,6 +18,7 @@
         .status-tip.error { background: #fef0f0; color: #f56c6c; }
         .status-tip.cached { background: #e8f4fd; color: #2b7de9; }
         .status-tip.downloading { background: #fef7e0; color: #e6a23c; }
+        .status-tip.h5plus { background: #f0f0e8; color: #8c8c6a; }
         .btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s; margin: 4px; }
         .btn-primary { background: #2b7de9; color: white; }
         .btn-primary:hover { background: #1a6ad5; }
@@ -87,6 +88,24 @@
     </div>
 
     <script>
+        // ==================== 检测环境 ====================
+        function isH5Plus() {
+            return typeof plus !== 'undefined' && plus.downloader;
+        }
+
+        function detectDevice() {
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            if (/android/i.test(ua)) return 'android';
+            if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'ios';
+            return 'other';
+        }
+
+        const isH5 = isH5Plus();
+        const deviceType = detectDevice();
+
+        console.log('📱 是否 H5+ 环境:', isH5);
+        console.log('📱 设备类型:', deviceType);
+
         // ==================== 配置 ====================
         const CONFIG = {
             BASE_URL: 'https://xglwx.siglenlift.cn/testfile',
@@ -100,25 +119,6 @@
         const TOKEN = urlParams.get('token') || '';
 
         const FILE_URL = CONFIG.BASE_URL + FILE_PATH;
-
-        // ==================== 检测设备 ====================
-        function detectDevice() {
-            const ua = navigator.userAgent || navigator.vendor || window.opera;
-            
-            // Android
-            if (/android/i.test(ua)) {
-                return 'android';
-            }
-            // iOS
-            if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
-                return 'ios';
-            }
-            // 其他
-            return 'other';
-        }
-
-        const deviceType = detectDevice();
-        console.log('📱 设备类型:', deviceType);
 
         // ==================== DOM 引用 ====================
         const $ = (id) => document.getElementById(id);
@@ -176,6 +176,90 @@
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // ==================== H5+ 下载（Android/iOS App） ====================
+
+        function downloadWithH5Plus(url, fileName) {
+            return new Promise((resolve, reject) => {
+                try {
+                    let picurl = url;
+                    if (TOKEN) {
+                        const connector = picurl.includes('?') ? '&' : '?';
+                        picurl += connector + 'token=' + encodeURIComponent(TOKEN);
+                    }
+
+                    console.log('📥 H5+ 开始下载:', picurl);
+
+                    let datas = {
+                        filename: '_downloads/' + fileName,
+                        method: 'GET',
+                        timeout: 60000
+                    };
+
+                    let dtask = plus.downloader.createDownload(
+                        picurl,
+                        datas,
+                        (d, status) => {
+                            console.log('📥 H5+ 下载完成, status:', status);
+                            
+                            if (status == 200) {
+                                // 下载成功
+                                showToast('下载完成，正在打开...', 'success');
+                                
+                                // 获取文件路径
+                                let filePath = d.filename;
+                                console.log('📁 文件保存路径:', filePath);
+                                
+                                // 打开文件
+                                try {
+                                    plus.runtime.openFile(filePath, (error) => {
+                                        if (error) {
+                                            console.error('打开文件失败:', error);
+                                            showToast('打开文件失败，请手动查看', 'error');
+                                        } else {
+                                            console.log('✅ 文件打开成功');
+                                        }
+                                    });
+                                } catch (openErr) {
+                                    console.error('打开文件异常:', openErr);
+                                    showToast('打开文件异常', 'error');
+                                }
+                                
+                                resolve({
+                                    success: true,
+                                    filePath: filePath,
+                                    filename: d.filename
+                                });
+                            } else {
+                                // 下载失败
+                                dtask.clear();
+                                reject(new Error('下载失败: ' + status));
+                            }
+                        }
+                    );
+
+                    // 监听下载进度
+                    dtask.addEventListener('statechanged', (task, status) => {
+                        if (task.state === 2) { // 下载中
+                            let progress = 0;
+                            if (task.totalSize > 0) {
+                                progress = parseInt(task.downloadedSize / task.totalSize * 100);
+                            }
+                            updateProgress(progress);
+                            fileInfo.textContent = `下载中 ${progress}%`;
+                            console.log('📊 下载进度:', progress + '%');
+                        }
+                    });
+
+                    // 开始下载
+                    dtask.start();
+
+                } catch (err) {
+                    console.error('H5+ 下载异常:', err);
+                    reject(err);
+                }
+            });
         }
 
         // ==================== 缓存操作 ====================
@@ -248,133 +332,28 @@
             }
         }
 
-        // ==================== 自动下载到系统 ====================
+        // ==================== 普通浏览器下载 ====================
 
         function downloadToSystem(blob, fileName) {
             try {
-                // 创建下载链接
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = fileName;
                 document.body.appendChild(a);
-                
-                // 触发下载
                 a.click();
-                
-                // 清理
                 setTimeout(() => {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 }, 1000);
                 
-                // 根据不同设备显示不同提示
-                let deviceName = '手机';
-                if (deviceType === 'android') {
-                    deviceName = 'Android 手机';
-                } else if (deviceType === 'ios') {
-                    deviceName = 'iOS 设备';
-                }
-                
-                showToast(`📥 文件已保存到 ${deviceName} 下载目录`, 'success');
-                console.log(`📥 文件已下载: ${fileName} (${deviceType})`);
-                
+                showToast('📥 文件已保存', 'success');
                 return true;
             } catch (err) {
                 console.error('下载失败:', err);
                 showToast('下载失败: ' + err.message, 'error');
                 return false;
             }
-        }
-
-        // ==================== 自动加载并预览 ====================
-
-        async function autoLoadAndPreview() {
-            if (isDownloading) return;
-            
-            // 1. 先检查缓存
-            const cachedBlob = await getCachedBlob();
-            if (cachedBlob) {
-                console.log('✅ 使用缓存文件');
-                currentBlob = cachedBlob;
-                isLoaded = true;
-                fileInfo.textContent = formatFileSize(cachedBlob.size) + ' (已缓存)';
-                setStatus('📦 从缓存加载，自动预览', 'cached');
-                showToast('📦 从缓存加载', 'cached');
-                setTimeout(() => openPreview(cachedBlob, FILE_NAME), 200);
-                return;
-            }
-
-            // 2. 没有缓存，从网络下载
-            isDownloading = true;
-            loadBtn.disabled = true;
-            showLoading(true, '正在下载文件...');
-            setStatus('⏳ 正在下载...', 'downloading');
-            showToast('📥 正在下载文件...', 'downloading');
-            updateProgress(0);
-
-            try {
-                let downloadUrl = FILE_URL;
-                if (TOKEN) {
-                    const connector = FILE_URL.includes('?') ? '&' : '?';
-                    downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
-                }
-
-                const response = await fetch(downloadUrl);
-                if (!response.ok) {
-                    throw new Error('下载失败: ' + response.status);
-                }
-
-                const contentLength = response.headers.get('content-length');
-                const total = contentLength ? parseInt(contentLength, 10) : 0;
-
-                const reader = response.body.getReader();
-                const chunks = [];
-                let loaded = 0;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    if (total) {
-                        const percent = (loaded / total) * 100;
-                        updateProgress(percent);
-                        fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
-                    }
-                }
-
-                const blob = new Blob(chunks);
-                console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
-                updateProgress(100);
-
-                // 缓存文件
-                await saveToCache(blob);
-
-                currentBlob = blob;
-                isLoaded = true;
-                fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
-                setStatus('✅ 下载完成，自动预览', 'success');
-                showLoading(false);
-
-                // 自动保存到系统
-                downloadToSystem(blob, FILE_NAME);
-
-                // 自动预览
-                setTimeout(() => {
-                    openPreview(blob, FILE_NAME);
-                }, 300);
-
-            } catch (err) {
-                console.error('❌ 加载失败:', err);
-                setStatus('❌ 加载失败: ' + err.message, 'error');
-                showLoading(false);
-                showToast('加载失败: ' + err.message, 'error');
-                fileInfo.textContent = '加载失败';
-            }
-
-            isDownloading = false;
-            loadBtn.disabled = false;
         }
 
         // ==================== 预览 ====================
@@ -428,6 +407,120 @@
             previewOverlay.classList.add('active');
         }
 
+        // ==================== 主加载逻辑 ====================
+
+        async function autoLoadAndPreview() {
+            if (isDownloading) return;
+            isDownloading = true;
+            loadBtn.disabled = true;
+
+            // ===== 如果是 H5+ 环境，使用 plus.downloader =====
+            if (isH5) {
+                showLoading(true, '正在下载...');
+                setStatus('📱 H5+ 下载中...', 'h5plus');
+                showToast('📱 使用 H5+ 下载', 'downloading');
+                updateProgress(0);
+
+                try {
+                    await downloadWithH5Plus(FILE_URL, FILE_NAME);
+                    showLoading(false);
+                    setStatus('✅ 下载完成', 'success');
+                    showToast('✅ 文件已保存到手机', 'success');
+                } catch (err) {
+                    console.error('❌ H5+ 下载失败:', err);
+                    setStatus('❌ 下载失败: ' + err.message, 'error');
+                    showLoading(false);
+                    showToast('下载失败: ' + err.message, 'error');
+                }
+
+                isDownloading = false;
+                loadBtn.disabled = false;
+                return;
+            }
+
+            // ===== 普通浏览器/WebView =====
+            try {
+                // 1. 检查缓存
+                const cachedBlob = await getCachedBlob();
+                if (cachedBlob) {
+                    console.log('✅ 使用缓存文件');
+                    currentBlob = cachedBlob;
+                    isLoaded = true;
+                    fileInfo.textContent = formatFileSize(cachedBlob.size) + ' (已缓存)';
+                    setStatus('📦 从缓存加载，自动预览', 'cached');
+                    showToast('📦 从缓存加载', 'cached');
+                    setTimeout(() => openPreview(cachedBlob, FILE_NAME), 200);
+                    isDownloading = false;
+                    loadBtn.disabled = false;
+                    return;
+                }
+
+                // 2. 从网络下载
+                showLoading(true, '正在下载文件...');
+                setStatus('⏳ 正在下载...', 'downloading');
+                showToast('📥 正在下载文件...', 'downloading');
+                updateProgress(0);
+
+                let downloadUrl = FILE_URL;
+                if (TOKEN) {
+                    const connector = FILE_URL.includes('?') ? '&' : '?';
+                    downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+                }
+
+                const response = await fetch(downloadUrl);
+                if (!response.ok) {
+                    throw new Error('下载失败: ' + response.status);
+                }
+
+                const contentLength = response.headers.get('content-length');
+                const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+                const reader = response.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    if (total) {
+                        const percent = (loaded / total) * 100;
+                        updateProgress(percent);
+                        fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
+                    }
+                }
+
+                const blob = new Blob(chunks);
+                console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
+                updateProgress(100);
+
+                await saveToCache(blob);
+
+                currentBlob = blob;
+                isLoaded = true;
+                fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
+                setStatus('✅ 下载完成，自动预览', 'success');
+                showLoading(false);
+
+                downloadToSystem(blob, FILE_NAME);
+
+                setTimeout(() => {
+                    openPreview(blob, FILE_NAME);
+                }, 300);
+
+            } catch (err) {
+                console.error('❌ 加载失败:', err);
+                setStatus('❌ 加载失败: ' + err.message, 'error');
+                showLoading(false);
+                showToast('加载失败: ' + err.message, 'error');
+                fileInfo.textContent = '加载失败';
+            }
+
+            isDownloading = false;
+            loadBtn.disabled = false;
+        }
+
         // ==================== 事件绑定 ====================
 
         loadBtn.addEventListener('click', autoLoadAndPreview);
@@ -448,30 +541,35 @@
             fileNameEl.textContent = FILE_NAME || '未命名文件';
             fileIcon.textContent = FILE_NAME.toLowerCase().endsWith('.pdf') ? '📄' : '📁';
             
-            // 根据设备显示不同提示
-            let deviceName = '手机';
-            if (deviceType === 'android') {
-                deviceName = 'Android 手机';
-                saveHint.textContent = '💡 文件将自动保存到 Android 下载目录';
-            } else if (deviceType === 'ios') {
-                deviceName = 'iOS 设备';
-                saveHint.textContent = '💡 文件将自动保存到 iOS 下载目录';
+            // 检测 H5+ 环境
+            if (isH5) {
+                saveHint.textContent = '📱 使用 H5+ 下载引擎 (Android/iOS)';
+                setStatus('📱 H5+ 环境已就绪', 'h5plus');
+                fileInfo.textContent = '点击加载下载';
             } else {
-                saveHint.textContent = '💡 文件将自动保存到电脑下载目录';
-            }
-            
-            setStatus('⏳ 准备加载...', 'loading');
+                let deviceName = '手机';
+                if (deviceType === 'android') {
+                    deviceName = 'Android 手机';
+                    saveHint.textContent = '💡 文件将自动保存到 Android 下载目录';
+                } else if (deviceType === 'ios') {
+                    deviceName = 'iOS 设备';
+                    saveHint.textContent = '💡 文件将自动保存到 iOS 下载目录';
+                } else {
+                    saveHint.textContent = '💡 文件将自动保存到电脑下载目录';
+                }
+                setStatus('⏳ 准备加载...', 'loading');
 
-            const cacheInfo = getCacheInfo();
-            if (cacheInfo) {
-                fileInfo.textContent = cacheInfo.size ? formatFileSize(cacheInfo.size) + ' (有缓存)' : '有缓存';
-                setStatus('📦 发现缓存，点击加载', 'cached');
-            } else {
-                fileInfo.textContent = '点击加载';
-                setStatus('⏳ 点击加载文件', 'loading');
+                const cacheInfo = getCacheInfo();
+                if (cacheInfo) {
+                    fileInfo.textContent = cacheInfo.size ? formatFileSize(cacheInfo.size) + ' (有缓存)' : '有缓存';
+                    setStatus('📦 发现缓存，点击加载', 'cached');
+                } else {
+                    fileInfo.textContent = '点击加载';
+                    setStatus('⏳ 点击加载文件', 'loading');
+                }
             }
 
-            console.log(`🚀 页面初始化完成 (${deviceType})`);
+            console.log(`🚀 页面初始化完成 (H5+: ${isH5}, 设备: ${deviceType})`);
         }
 
         init();
