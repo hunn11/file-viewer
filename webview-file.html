@@ -467,12 +467,12 @@
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
 
+                 console.log('autoLoadAndPreview',downloadUrl);
                 const response = await fetch(downloadUrl, {
-                    mode: 'cors',  // 明确指定 CORS 模式
-                    credentials: 'omit',  // 不发送凭证
+                    mode: 'cors',  
+                    credentials: 'omit', 
                     headers: {
                         'Content-Type': 'application/octet-stream',
-                        // 如果服务端需要 token，可以放在 header 中
                         'Authorization': TOKEN ? `Bearer ${TOKEN}` : '',
                     }
                 });
