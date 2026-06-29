@@ -475,7 +475,7 @@
                     try {
                         // 尝试使用 cors-anywhere
                         const proxyurl = "https://cors-anywhere.herokuapp.com/";
-                        const response = await fetch(proxyurl + url);
+                        const response = await fetch(proxyurl + downloadUrl );
                         if (response.ok) {
                             return await response.blob();
                         }
@@ -485,7 +485,7 @@
                         
                         // 备用代理
                         const backupProxy = "https://api.allorigins.win/raw?url=";
-                        const response = await fetch(backupProxy + encodeURIComponent(url));
+                        const response = await fetch(backupProxy + encodeURIComponent(downloadUrl ));
                         if (!response.ok) {
                             throw new Error('所有代理均失败');
                         }
