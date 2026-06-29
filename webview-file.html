@@ -848,6 +848,8 @@
                 fullDownloadBtn.className = 'btn btn-wechat';
                 // 隐藏主按钮
                 loadBtn.style.display = 'none';
+                const deviceType = detectDevice();
+                console.log('📱 设备类型:', deviceType);
             } else if (isH5) {
                 saveHint.textContent = '📱 使用 H5+ 下载引擎';
                 setStatus('📱 H5+ 环境已就绪', 'h5plus');
