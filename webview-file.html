@@ -409,46 +409,42 @@
 
         // ==================== 主加载逻辑 ====================
 
-        async function autoLoadAndPreview() {
+       async function autoLoadAndPreview() {
             if (isDownloading) return;
             isDownloading = true;
             loadBtn.disabled = true;
-
-             const isHBuilderWebView = navigator.userAgent.includes('HBuilder') || 
-                              navigator.userAgent.includes('hbuilder');
-                
-                if (isHBuilderWebView) {
-                    try {
-                        let downloadUrl = FILE_URL;
-                        if (TOKEN) {
-                            const connector = FILE_URL.includes('?') ? '&' : '?';
-                            downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
-                        }
-                        
-                        // 直接跳转下载
-                        showToast('📥 正在下载...hb', 'downloading');
-                        window.location.href = downloadUrl;
-                        
-                        setTimeout(() => {
-                            setStatus('✅ 下载已触发', 'success');
-                            showLoading(false);
-                        }, 1000);
-                    } catch (err) {
-                        showToast('下载失败: ' + err.message, 'error');
+        
+            // ===== HBuilder WebView 环境 =====
+            const isHBuilderWebView = navigator.userAgent.includes('HBuilder') || 
+                                      navigator.userAgent.includes('hbuilder');
+            
+            if (isHBuilderWebView) {
+                try {
+                    let downloadUrl = FILE_URL;
+                    if (TOKEN) {
+                        const connector = FILE_URL.includes('?') ? '&' : '?';
+                        downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                     }
-                    
-                    isDownloading = false;
-                    loadBtn.disabled = false;
-                    return;
+                    showToast('📥 正在下载...', 'downloading');
+                    window.location.href = downloadUrl;
+                    setTimeout(() => {
+                        setStatus('✅ 下载已触发', 'success');
+                        showLoading(false);
+                    }, 1000);
+                } catch (err) {
+                    showToast('下载失败: ' + err.message, 'error');
                 }
-                
-            // ===== 如果是 H5+ 环境，使用 plus.downloader =====
+                isDownloading = false;
+                loadBtn.disabled = false;
+                return;
+            }
+            
+            // ===== H5+ 环境 =====
             if (isH5) {
                 showLoading(true, '正在下载...');
                 setStatus('📱 H5+ 下载中...', 'h5plus');
                 showToast('📱 使用 H5+ 下载', 'downloading');
                 updateProgress(0);
-
                 try {
                     await downloadWithH5Plus(FILE_URL, FILE_NAME);
                     showLoading(false);
@@ -460,13 +456,12 @@
                     showLoading(false);
                     showToast('下载失败: ' + err.message, 'error');
                 }
-
                 isDownloading = false;
                 loadBtn.disabled = false;
                 return;
             }
-
-            // ===== 普通浏览器/WebView =====
+        
+            // ===== 普通浏览器 =====
             try {
                 // 1. 检查缓存
                 const cachedBlob = await getCachedBlob();
@@ -482,31 +477,59 @@
                     loadBtn.disabled = false;
                     return;
                 }
-
-                // 2. 从网络下载
+        
+                // 2. 尝试 fetch 下载
                 showLoading(true, '正在下载文件...');
                 setStatus('⏳ 正在下载...', 'downloading');
                 showToast('📥 正在下载文件...', 'downloading');
                 updateProgress(0);
-
+        
                 let downloadUrl = FILE_URL;
                 if (TOKEN) {
                     const connector = FILE_URL.includes('?') ? '&' : '?';
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
-
-                const response = await fetch(downloadUrl);
+        
+                // 🔥 关键修改：使用 fetch 并处理 CORS 错误
+                let response;
+                try {
+                    response = await fetch(downloadUrl);
+                } catch (fetchError) {
+                    // 🔥 fetch 失败（包括 CORS 错误），降级到直接跳转下载
+                    console.warn('⚠️ fetch 失败，使用降级方案:', fetchError);
+                    showToast('📥 直接下载（浏览器打开）', 'downloading');
+                    
+                    // 降级方案：使用 window.open 或 location.href 直接跳转
+                    // 这样会触发浏览器原生下载，绕过 CORS
+                    if (confirm('文件较大，是否直接下载？')) {
+                        window.open(downloadUrl, '_blank');
+                        // 或者使用 iframe 方式
+                        // const iframe = document.createElement('iframe');
+                        // iframe.style.display = 'none';
+                        // iframe.src = downloadUrl;
+                        // document.body.appendChild(iframe);
+                        // setTimeout(() => document.body.removeChild(iframe), 5000);
+                    }
+                    
+                    setStatus('📥 已触发浏览器下载', 'success');
+                    showLoading(false);
+                    isDownloading = false;
+                    loadBtn.disabled = false;
+                    return;
+                }
+        
+                // 如果 fetch 成功但响应不正常
                 if (!response.ok) {
                     throw new Error('下载失败: ' + response.status);
                 }
-
+        
+                // 正常处理响应流...
                 const contentLength = response.headers.get('content-length');
                 const total = contentLength ? parseInt(contentLength, 10) : 0;
-
                 const reader = response.body.getReader();
                 const chunks = [];
                 let loaded = 0;
-
+        
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -518,37 +541,43 @@
                         fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
                     }
                 }
-
+        
                 const blob = new Blob(chunks);
                 console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
                 updateProgress(100);
-
+        
                 await saveToCache(blob);
-
                 currentBlob = blob;
                 isLoaded = true;
                 fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
                 setStatus('✅ 下载完成，自动预览', 'success');
                 showLoading(false);
-
+        
+                // 下载到本地
                 downloadToSystem(blob, FILE_NAME);
-
-                setTimeout(() => {
-                    openPreview(blob, FILE_NAME);
-                }, 300);
-
+                setTimeout(() => openPreview(blob, FILE_NAME), 300);
+        
             } catch (err) {
                 console.error('❌ 加载失败:', err);
                 setStatus('❌ 加载失败: ' + err.message, 'error');
                 showLoading(false);
                 showToast('加载失败: ' + err.message, 'error');
                 fileInfo.textContent = '加载失败';
+        
+                // 🔥 最后的降级：直接跳转下载
+                if (confirm('加载失败，是否尝试直接下载？')) {
+                    let downloadUrl = FILE_URL;
+                    if (TOKEN) {
+                        const connector = FILE_URL.includes('?') ? '&' : '?';
+                        downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+                    }
+                    window.open(downloadUrl, '_blank');
+                }
             }
-
+        
             isDownloading = false;
             loadBtn.disabled = false;
         }
-
         // ==================== 事件绑定 ====================
 
         loadBtn.addEventListener('click', autoLoadAndPreview);
