@@ -108,6 +108,11 @@
 
         // ==================== 配置 ====================
         const CONFIG = {
+            // 使用 CORS 代理服务
+            PROXY_URL: 'https://cors-anywhere.herokuapp.com/',
+            // 或者使用其他代理
+            // PROXY_URL: 'https://api.allorigins.win/raw?url=',
+            // PROXY_URL: 'https://corsproxy.io/?url=',
             BASE_URL: 'https://xglwx.siglenlift.cn/testfile',
             CACHE_KEY: 'cached_file_data',
         };
@@ -467,15 +472,18 @@
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
 
-                 console.log('autoLoadAndPreview',downloadUrl);
-                const response = await fetch(downloadUrl, {
-                    mode: 'cors',  
-                    credentials: 'omit', 
-                    headers: {
-                        'Content-Type': 'application/octet-stream',
-                        'Authorization': TOKEN ? `Bearer ${TOKEN}` : '',
+                const proxyUrl = CONFIG.PROXY_URL + downloadUrl;
+                    
+                    try {
+                        const response = await fetch(proxyUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Origin': window.location.origin,
+                            }
+                        });
+                    }.catch(err)=>{
+                         console.log('autoLoadAndPreview',downloadUrl,err);
                     }
-                });
                 // const response = await fetch(downloadUrl);
                 // if (!response.ok) {
                 //     throw new Error('下载失败: ' + response.status);
