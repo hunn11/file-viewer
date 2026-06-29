@@ -414,6 +414,34 @@
             isDownloading = true;
             loadBtn.disabled = true;
 
+             const isHBuilderWebView = navigator.userAgent.includes('HBuilder') || 
+                              navigator.userAgent.includes('hbuilder');
+                
+                if (isHBuilderWebView) {
+                    try {
+                        let downloadUrl = FILE_URL;
+                        if (TOKEN) {
+                            const connector = FILE_URL.includes('?') ? '&' : '?';
+                            downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+                        }
+                        
+                        // 直接跳转下载
+                        showToast('📥 正在下载...hb', 'downloading');
+                        window.location.href = downloadUrl;
+                        
+                        setTimeout(() => {
+                            setStatus('✅ 下载已触发', 'success');
+                            showLoading(false);
+                        }, 1000);
+                    } catch (err) {
+                        showToast('下载失败: ' + err.message, 'error');
+                    }
+                    
+                    isDownloading = false;
+                    loadBtn.disabled = false;
+                    return;
+                }
+                
             // ===== 如果是 H5+ 环境，使用 plus.downloader =====
             if (isH5) {
                 showLoading(true, '正在下载...');
