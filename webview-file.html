@@ -467,10 +467,19 @@
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
 
-                const response = await fetch(downloadUrl);
-                if (!response.ok) {
-                    throw new Error('下载失败: ' + response.status);
-                }
+                const response = await fetch(downloadUrl, {
+                    mode: 'cors',  // 明确指定 CORS 模式
+                    credentials: 'omit',  // 不发送凭证
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                        // 如果服务端需要 token，可以放在 header 中
+                        'Authorization': TOKEN ? `Bearer ${TOKEN}` : '',
+                    }
+                });
+                // const response = await fetch(downloadUrl);
+                // if (!response.ok) {
+                //     throw new Error('下载失败: ' + response.status);
+                // }
 
                 const contentLength = response.headers.get('content-length');
                 const total = contentLength ? parseInt(contentLength, 10) : 0;
