@@ -108,7 +108,6 @@
 
         // ==================== 配置 ====================
         const CONFIG = {
-            PROXY_URL: 'https://cors-anywhere.herokuapp.com/',
             BASE_URL: 'https://xglwx.siglenlift.cn/testfile',
             CACHE_KEY: 'cached_file_data',
         };
@@ -467,23 +466,32 @@
                     const connector = FILE_URL.includes('?') ? '&' : '?';
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
-
-                const proxyUrl = CONFIG.PROXY_URL + downloadUrl;
-                    
-                    try {
-                        const response = await fetch(proxyUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Origin': window.location.origin,
-                            }
-                        });
-                    }catch(err)=>{
-                         console.log('err',err);
-                    }
+                // const proxyurl = "https://cors-anywhere.herokuapp.com/";
                 // const response = await fetch(downloadUrl);
                 // if (!response.ok) {
                 //     throw new Error('下载失败: ' + response.status);
                 // }
+                async function fetchWithProxy(url) {
+                    try {
+                        // 尝试使用 cors-anywhere
+                        const proxyurl = "https://cors-anywhere.herokuapp.com/";
+                        const response = await fetch(proxyurl + url);
+                        if (response.ok) {
+                            return await response.blob();
+                        }
+                        throw new Error('代理请求失败');
+                    } catch (err) {
+                        console.warn('cors-anywhere 失败，尝试备用代理...');
+                        
+                        // 备用代理
+                        const backupProxy = "https://api.allorigins.win/raw?url=";
+                        const response = await fetch(backupProxy + encodeURIComponent(url));
+                        if (!response.ok) {
+                            throw new Error('所有代理均失败');
+                        }
+                        return await response.blob();
+                    }
+                }
 
                 const contentLength = response.headers.get('content-length');
                 const total = contentLength ? parseInt(contentLength, 10) : 0;
