@@ -413,14 +413,14 @@
             if (isDownloading) return;
             isDownloading = true;
             loadBtn.disabled = true;
-        
+
             // ===== 如果是 H5+ 环境，使用 plus.downloader =====
             if (isH5) {
                 showLoading(true, '正在下载...');
                 setStatus('📱 H5+ 下载中...', 'h5plus');
                 showToast('📱 使用 H5+ 下载', 'downloading');
                 updateProgress(0);
-        
+
                 try {
                     await downloadWithH5Plus(FILE_URL, FILE_NAME);
                     showLoading(false);
@@ -432,12 +432,12 @@
                     showLoading(false);
                     showToast('下载失败: ' + err.message, 'error');
                 }
-        
+
                 isDownloading = false;
                 loadBtn.disabled = false;
                 return;
             }
-        
+
             // ===== 普通浏览器/WebView =====
             try {
                 // 1. 检查缓存
@@ -454,71 +454,61 @@
                     loadBtn.disabled = false;
                     return;
                 }
-        
+
                 // 2. 从网络下载
                 showLoading(true, '正在下载文件...');
                 setStatus('⏳ 正在下载...', 'downloading');
                 showToast('📥 正在下载文件...', 'downloading');
                 updateProgress(0);
-        
+
                 let downloadUrl = FILE_URL;
                 if (TOKEN) {
                     const connector = FILE_URL.includes('?') ? '&' : '?';
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
-        
-                // ===== 使用代理下载 =====
-                async function fetchWithProxy(url) {
-                    try {
-                        // 尝试使用 cors-anywhere
-                        const proxyurl = "https://cors-anywhere.herokuapp.com/";
-                        const fullUrl = proxyurl + url;
-                        console.log('📥 代理下载地址:', fullUrl);
-                        
-                        const response = await fetch(fullUrl);
-                        if (response.ok) {
-                            return await response.blob();
-                        }
-                        throw new Error('代理请求失败: ' + response.status);
-                    } catch (err) {
-                        console.warn('⚠️ cors-anywhere 失败，尝试备用代理...', err.message);
-                        
-                        // 备用代理
-                        const backupProxy = "https://api.allorigins.win/raw?url=";
-                        const backupUrl = backupProxy + encodeURIComponent(url);
-                        console.log('📥 备用代理地址:', backupUrl);
-                        
-                        const response = await fetch(backupUrl);
-                        if (!response.ok) {
-                            throw new Error('备用代理失败: ' + response.status);
-                        }
-                        return await response.blob();
+
+                const response = await fetch(downloadUrl);
+                if (!response.ok) {
+                    throw new Error('下载失败: ' + response.status);
+                }
+
+                const contentLength = response.headers.get('content-length');
+                const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+                const reader = response.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    if (total) {
+                        const percent = (loaded / total) * 100;
+                        updateProgress(percent);
+                        fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
                     }
                 }
-        
-                // ===== 执行下载 =====
-                const blob = await fetchWithProxy(downloadUrl);
-                
+
+                const blob = new Blob(chunks);
                 console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
                 updateProgress(100);
-        
-                // 保存到缓存
+
                 await saveToCache(blob);
-        
+
                 currentBlob = blob;
                 isLoaded = true;
                 fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
                 setStatus('✅ 下载完成，自动预览', 'success');
                 showLoading(false);
-        
-                // 下载到系统
+
                 downloadToSystem(blob, FILE_NAME);
-        
-                // 预览
+
                 setTimeout(() => {
                     openPreview(blob, FILE_NAME);
                 }, 300);
-        
+
             } catch (err) {
                 console.error('❌ 加载失败:', err);
                 setStatus('❌ 加载失败: ' + err.message, 'error');
@@ -526,10 +516,11 @@
                 showToast('加载失败: ' + err.message, 'error');
                 fileInfo.textContent = '加载失败';
             }
-        
+
             isDownloading = false;
             loadBtn.disabled = false;
         }
+
         // ==================== 事件绑定 ====================
 
         loadBtn.addEventListener('click', autoLoadAndPreview);
