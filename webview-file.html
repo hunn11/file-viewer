@@ -108,11 +108,7 @@
 
         // ==================== 配置 ====================
         const CONFIG = {
-            // 使用 CORS 代理服务
             PROXY_URL: 'https://cors-anywhere.herokuapp.com/',
-            // 或者使用其他代理
-            // PROXY_URL: 'https://api.allorigins.win/raw?url=',
-            // PROXY_URL: 'https://corsproxy.io/?url=',
             BASE_URL: 'https://xglwx.siglenlift.cn/testfile',
             CACHE_KEY: 'cached_file_data',
         };
@@ -482,7 +478,7 @@
                             }
                         });
                     }catch(err)=>{
-                         console.log('autoLoadAndPreview',downloadUrl,err);
+                         console.log('err',err);
                     }
                 // const response = await fetch(downloadUrl);
                 // if (!response.ok) {
