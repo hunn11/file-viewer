@@ -492,7 +492,7 @@
                         return await response.blob();
                     }
                 }
-
+               console.log('完整代理URL:', proxyurl + downloadUrl);
                 const contentLength = response.headers.get('content-length');
                 const total = contentLength ? parseInt(contentLength, 10) : 0;
 
