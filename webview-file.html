@@ -410,174 +410,226 @@
         // ==================== 主加载逻辑 ====================
 
        async function autoLoadAndPreview() {
-            if (isDownloading) return;
-            isDownloading = true;
-            loadBtn.disabled = true;
-        
-            // ===== HBuilder WebView 环境 =====
-            const isHBuilderWebView = navigator.userAgent.includes('HBuilder') || 
-                                      navigator.userAgent.includes('hbuilder');
-            
-            if (isHBuilderWebView) {
-                try {
-                    let downloadUrl = FILE_URL;
-                    if (TOKEN) {
-                        const connector = FILE_URL.includes('?') ? '&' : '?';
-                        downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
-                    }
-                    showToast('📥 正在下载...', 'downloading');
-                    window.location.href = downloadUrl;
-                    setTimeout(() => {
-                        setStatus('✅ 下载已触发', 'success');
-                        showLoading(false);
-                    }, 1000);
-                } catch (err) {
-                    showToast('下载失败: ' + err.message, 'error');
-                }
-                isDownloading = false;
-                loadBtn.disabled = false;
-                return;
-            }
-            
-            // ===== H5+ 环境 =====
-            if (isH5) {
-                showLoading(true, '正在下载...');
-                setStatus('📱 H5+ 下载中...', 'h5plus');
-                showToast('📱 使用 H5+ 下载', 'downloading');
-                updateProgress(0);
-                try {
-                    await downloadWithH5Plus(FILE_URL, FILE_NAME);
-                    showLoading(false);
-                    setStatus('✅ 下载完成', 'success');
-                    showToast('✅ 文件已保存到手机', 'success');
-                } catch (err) {
-                    console.error('❌ H5+ 下载失败:', err);
-                    setStatus('❌ 下载失败: ' + err.message, 'error');
-                    showLoading(false);
-                    showToast('下载失败: ' + err.message, 'error');
-                }
-                isDownloading = false;
-                loadBtn.disabled = false;
-                return;
-            }
-        
-            // ===== 普通浏览器 =====
+        if (isDownloading) return;
+        isDownloading = true;
+        loadBtn.disabled = true;
+    
+        // ===== 检测微信环境 =====
+        const isWechat = navigator.userAgent.toLowerCase().includes('micromessenger');
+        const isMiniProgram = navigator.userAgent.toLowerCase().includes('miniprogram');
+        const isHBuilderWebView = navigator.userAgent.includes('HBuilder') || 
+                                  navigator.userAgent.includes('hbuilder');
+    
+        // ===== 如果在微信或小程序 WebView 中 =====
+        if (isWechat || isMiniProgram) {
             try {
-                // 1. 检查缓存
-                const cachedBlob = await getCachedBlob();
-                if (cachedBlob) {
-                    console.log('✅ 使用缓存文件');
-                    currentBlob = cachedBlob;
-                    isLoaded = true;
-                    fileInfo.textContent = formatFileSize(cachedBlob.size) + ' (已缓存)';
-                    setStatus('📦 从缓存加载，自动预览', 'cached');
-                    showToast('📦 从缓存加载', 'cached');
-                    setTimeout(() => openPreview(cachedBlob, FILE_NAME), 200);
-                    isDownloading = false;
-                    loadBtn.disabled = false;
-                    return;
-                }
-        
-                // 2. 尝试 fetch 下载
-                showLoading(true, '正在下载文件...');
-                setStatus('⏳ 正在下载...', 'downloading');
-                showToast('📥 正在下载文件...', 'downloading');
-                updateProgress(0);
-        
                 let downloadUrl = FILE_URL;
                 if (TOKEN) {
                     const connector = FILE_URL.includes('?') ? '&' : '?';
                     downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
                 }
-        
-                // 🔥 关键修改：使用 fetch 并处理 CORS 错误
-                let response;
-                try {
-                    response = await fetch(downloadUrl);
-                } catch (fetchError) {
-                    // 🔥 fetch 失败（包括 CORS 错误），降级到直接跳转下载
-                    console.warn('⚠️ fetch 失败，使用降级方案:', fetchError);
-                    showToast('📥 直接下载（浏览器打开）', 'downloading');
-                    
-                    // 降级方案：使用 window.open 或 location.href 直接跳转
-                    // 这样会触发浏览器原生下载，绕过 CORS
-                    if (confirm('文件较大，是否直接下载？')) {
-                        window.open(downloadUrl, '_blank');
-                        // 或者使用 iframe 方式
-                        // const iframe = document.createElement('iframe');
-                        // iframe.style.display = 'none';
-                        // iframe.src = downloadUrl;
-                        // document.body.appendChild(iframe);
-                        // setTimeout(() => document.body.removeChild(iframe), 5000);
+                
+                showToast('📱 正在打开浏览器...', 'downloading');
+                setStatus('📱 正在跳转到浏览器...', 'downloading');
+                
+                // 🔥 核心：使用 weixin:// 协议尝试唤醒系统浏览器
+                // 不同微信版本可能行为不同，但这是最接近"自动"的方式
+                const wechatScheme = `weixin://open?url=${encodeURIComponent(downloadUrl)}`;
+                
+                // 尝试方案1：weixin:// 协议
+                window.location.href = wechatScheme;
+                
+                // 备用方案：如果上述无效，尝试用 a 标签
+                setTimeout(() => {
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.target = '_blank';
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => document.body.removeChild(a), 1000);
+                }, 100);
+                
+                // 如果都不行，显示一个可点击的链接
+                setTimeout(() => {
+                    if (!document.querySelector('.fallback-link')) {
+                        const linkHTML = `
+                            <div class="fallback-link" style="margin-top:16px;padding:16px;background:#f0f7ff;border-radius:12px;">
+                                <p style="font-size:13px;color:#606266;margin-bottom:8px;">如果未自动跳转，请点击下方链接：</p>
+                                <a href="${downloadUrl}" target="_blank" style="color:#2b7de9;font-size:14px;word-break:break-all;">
+                                    ${downloadUrl}
+                                </a>
+                                <p style="font-size:12px;color:#8c9aa8;margin-top:8px;">点击后选择"用浏览器打开"即可下载</p>
+                            </div>
+                        `;
+                        document.querySelector('.card').insertAdjacentHTML('beforeend', linkHTML);
                     }
-                    
-                    setStatus('📥 已触发浏览器下载', 'success');
-                    showLoading(false);
-                    isDownloading = false;
-                    loadBtn.disabled = false;
-                    return;
-                }
-        
-                // 如果 fetch 成功但响应不正常
-                if (!response.ok) {
-                    throw new Error('下载失败: ' + response.status);
-                }
-        
-                // 正常处理响应流...
-                const contentLength = response.headers.get('content-length');
-                const total = contentLength ? parseInt(contentLength, 10) : 0;
-                const reader = response.body.getReader();
-                const chunks = [];
-                let loaded = 0;
-        
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    if (total) {
-                        const percent = (loaded / total) * 100;
-                        updateProgress(percent);
-                        fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
-                    }
-                }
-        
-                const blob = new Blob(chunks);
-                console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
-                updateProgress(100);
-        
-                await saveToCache(blob);
-                currentBlob = blob;
-                isLoaded = true;
-                fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
-                setStatus('✅ 下载完成，自动预览', 'success');
+                }, 500);
+                
+                setStatus('📱 正在跳转到浏览器...', 'downloading');
                 showLoading(false);
-        
-                // 下载到本地
-                downloadToSystem(blob, FILE_NAME);
-                setTimeout(() => openPreview(blob, FILE_NAME), 300);
-        
+                
             } catch (err) {
-                console.error('❌ 加载失败:', err);
-                setStatus('❌ 加载失败: ' + err.message, 'error');
-                showLoading(false);
-                showToast('加载失败: ' + err.message, 'error');
-                fileInfo.textContent = '加载失败';
-        
-                // 🔥 最后的降级：直接跳转下载
-                if (confirm('加载失败，是否尝试直接下载？')) {
-                    let downloadUrl = FILE_URL;
-                    if (TOKEN) {
-                        const connector = FILE_URL.includes('?') ? '&' : '?';
-                        downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
-                    }
-                    window.open(downloadUrl, '_blank');
-                }
+                console.error('❌ 跳转失败:', err);
+                showToast('请手动复制链接到浏览器打开', 'error');
             }
-        
+            
             isDownloading = false;
             loadBtn.disabled = false;
+            return;
         }
+    
+        // ===== HBuilder WebView 环境 =====
+        if (isHBuilderWebView) {
+            try {
+                let downloadUrl = FILE_URL;
+                if (TOKEN) {
+                    const connector = FILE_URL.includes('?') ? '&' : '?';
+                    downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+                }
+                showToast('📥 正在下载...', 'downloading');
+                window.location.href = downloadUrl;
+                setTimeout(() => {
+                    setStatus('✅ 下载已触发', 'success');
+                    showLoading(false);
+                }, 1000);
+            } catch (err) {
+                showToast('下载失败: ' + err.message, 'error');
+            }
+            isDownloading = false;
+            loadBtn.disabled = false;
+            return;
+        }
+        
+        // ===== H5+ 环境 =====
+        if (isH5) {
+            showLoading(true, '正在下载...');
+            setStatus('📱 H5+ 下载中...', 'h5plus');
+            showToast('📱 使用 H5+ 下载', 'downloading');
+            updateProgress(0);
+            try {
+                await downloadWithH5Plus(FILE_URL, FILE_NAME);
+                showLoading(false);
+                setStatus('✅ 下载完成', 'success');
+                showToast('✅ 文件已保存到手机', 'success');
+            } catch (err) {
+                console.error('❌ H5+ 下载失败:', err);
+                setStatus('❌ 下载失败: ' + err.message, 'error');
+                showLoading(false);
+                showToast('下载失败: ' + err.message, 'error');
+            }
+            isDownloading = false;
+            loadBtn.disabled = false;
+            return;
+        }
+    
+        // ===== 普通浏览器 =====
+        try {
+            // 检查缓存
+            const cachedBlob = await getCachedBlob();
+            if (cachedBlob) {
+                console.log('✅ 使用缓存文件');
+                currentBlob = cachedBlob;
+                isLoaded = true;
+                fileInfo.textContent = formatFileSize(cachedBlob.size) + ' (已缓存)';
+                setStatus('📦 从缓存加载，自动预览', 'cached');
+                showToast('📦 从缓存加载', 'cached');
+                setTimeout(() => openPreview(cachedBlob, FILE_NAME), 200);
+                isDownloading = false;
+                loadBtn.disabled = false;
+                return;
+            }
+    
+            // 从网络下载
+            showLoading(true, '正在下载文件...');
+            setStatus('⏳ 正在下载...', 'downloading');
+            showToast('📥 正在下载文件...', 'downloading');
+            updateProgress(0);
+    
+            let downloadUrl = FILE_URL;
+            if (TOKEN) {
+                const connector = FILE_URL.includes('?') ? '&' : '?';
+                downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+            }
+    
+            let response;
+            try {
+                response = await fetch(downloadUrl);
+            } catch (fetchError) {
+                console.warn('⚠️ fetch 失败，使用降级方案:', fetchError);
+                showToast('📥 直接下载', 'downloading');
+                
+                // 🔥 普通浏览器降级：用 location.href 直接跳转
+                window.location.href = downloadUrl;
+                // 或者用 iframe
+                // const iframe = document.createElement('iframe');
+                // iframe.style.display = 'none';
+                // iframe.src = downloadUrl;
+                // document.body.appendChild(iframe);
+                // setTimeout(() => document.body.removeChild(iframe), 5000);
+                
+                setStatus('📥 已触发浏览器下载', 'success');
+                showLoading(false);
+                isDownloading = false;
+                loadBtn.disabled = false;
+                return;
+            }
+    
+            if (!response.ok) {
+                throw new Error('下载失败: ' + response.status);
+            }
+    
+            const contentLength = response.headers.get('content-length');
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            const reader = response.body.getReader();
+            const chunks = [];
+            let loaded = 0;
+    
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+                if (total) {
+                    const percent = (loaded / total) * 100;
+                    updateProgress(percent);
+                    fileInfo.textContent = `下载中 ${Math.round(percent)}%`;
+                }
+            }
+    
+            const blob = new Blob(chunks);
+            console.log('✅ 文件下载完成，大小:', blob.size, 'bytes');
+            updateProgress(100);
+    
+            await saveToCache(blob);
+            currentBlob = blob;
+            isLoaded = true;
+            fileInfo.textContent = formatFileSize(blob.size) + ' (已下载)';
+            setStatus('✅ 下载完成，自动预览', 'success');
+            showLoading(false);
+    
+            downloadToSystem(blob, FILE_NAME);
+            setTimeout(() => openPreview(blob, FILE_NAME), 300);
+    
+        } catch (err) {
+            console.error('❌ 加载失败:', err);
+            setStatus('❌ 加载失败: ' + err.message, 'error');
+            showLoading(false);
+            showToast('加载失败: ' + err.message, 'error');
+            fileInfo.textContent = '加载失败';
+            
+            // 最后的降级
+            let downloadUrl = FILE_URL;
+            if (TOKEN) {
+                const connector = FILE_URL.includes('?') ? '&' : '?';
+                downloadUrl += connector + 'token=' + encodeURIComponent(TOKEN);
+            }
+            window.location.href = downloadUrl;
+        }
+    
+        isDownloading = false;
+        loadBtn.disabled = false;
+    }
         // ==================== 事件绑定 ====================
 
         loadBtn.addEventListener('click', autoLoadAndPreview);
